@@ -43,12 +43,17 @@ Les règles officielles du jeu n'étaient pas accessibles. Le modèle part donc 
   - `WILD_MULT` : les multis se multiplient ;
   - `GLOBAL_SUM` : les multis ne sont pas des wilds, et leur somme multiplie le gain total du spin.
 - Les trophées et les globes ne sont pas recouverts par les multis.
-- Une ligne ou une way 100 % wild paie comme le premier symbole PAY (le Singe).
-- Les cases sont tirées indépendamment, selon les poids de chaque rouleau.
+- En lignes, une ligne 100 % wild paie comme le premier symbole PAY (le Singe). En ways, une way doit commencer par un vrai symbole sur le rouleau 1 : une way 100 % wild ne paie pas (règle du SDK).
+- Chaque case suit les poids de son rouleau, avec au plus 1 trophée par rouleau visible, comme sur les bandes du SDK de Stake Engine.
 - Les multis ne restent pas d'un spin à l'autre.
+- En WILD_ADD, seuls les multis supérieurs à 1x s'additionnent : le globe 1x ne compte pas. C'est la règle du SDK.
 - La paytable, les poids et les multis sont des **valeurs de départ calées pour environ 96 %**. Ce ne sont pas les valeurs officielles du jeu.
+
+## Passer sur Stake Engine
+
+Le dossier [`../stake_math`](../stake_math/README.md) exporte cette feuille vers le math SDK officiel de Stake Engine et génère les fichiers à publier. Les règles du simulateur sont alignées sur celles du SDK : sur 20 000 grilles, les gains sont identiques pour les 4 combinaisons de modes.
 
 ## Vérifications faites
 
 - Avec le poids du globe à 0, le RTP simulé est égal au RTP analytique de *Calc_Gains*, en lignes comme en ways.
-- Sur des grilles aléatoires, le calcul rapide des gains (lignes, ways, et les 3 modes de multis) donne le même résultat qu'une énumération brute de toutes les lignes et de toutes les ways.
+- Sur 20 000 grilles aléatoires avec globes, le simulateur donne exactement les mêmes gains que le math SDK de Stake Engine, pour les 4 combinaisons de modes gérées par le SDK (`../stake_math/verifier_sdk.py`).
