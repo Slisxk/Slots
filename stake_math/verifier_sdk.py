@@ -199,6 +199,7 @@ def verifier_globe_garanti(classeur, config, simulateur, GameState, n_grilles):
     """Bonus avec globe garanti : compare statistiquement un free spin du SDK (bandes FRk exportées,
     ensure_globe, cascades) et de la feuille (_tirage avec globe garanti)."""
     p = simulateur.load_params(classeur)          # paramètres réels (pas ceux modifiés pour les tests)
+    config.__init__()                              # recharge la vraie config du jeu (modifiée par les tests)
     if p["mode_gain"] != "CLUSTER" or config.win_type != "cluster":
         return True
     ok = True
