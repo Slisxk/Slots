@@ -13,737 +13,737 @@
     {
       "symbol": "H1",
       "kind": 5,
-      "pay": 2.0
+      "pay": 2.5
     },
     {
       "symbol": "H1",
       "kind": 6,
-      "pay": 3.0
+      "pay": 3.5
     },
     {
       "symbol": "H1",
       "kind": 7,
-      "pay": 4.0
+      "pay": 5.0
     },
     {
       "symbol": "H1",
       "kind": 8,
+      "pay": 7.0
+    },
+    {
+      "symbol": "H1",
+      "kind": 9,
+      "pay": 12.0
+    },
+    {
+      "symbol": "H1",
+      "kind": 10,
+      "pay": 12.0
+    },
+    {
+      "symbol": "H1",
+      "kind": 11,
+      "pay": 25.0
+    },
+    {
+      "symbol": "H1",
+      "kind": 12,
+      "pay": 25.0
+    },
+    {
+      "symbol": "H1",
+      "kind": 13,
+      "pay": 60.0
+    },
+    {
+      "symbol": "H1",
+      "kind": 14,
+      "pay": 60.0
+    },
+    {
+      "symbol": "H1",
+      "kind": 15,
+      "pay": 60.0
+    },
+    {
+      "symbol": "H1",
+      "kind": 16,
+      "pay": 180.0
+    },
+    {
+      "symbol": "H1",
+      "kind": 17,
+      "pay": 180.0
+    },
+    {
+      "symbol": "H1",
+      "kind": 18,
+      "pay": 180.0
+    },
+    {
+      "symbol": "H1",
+      "kind": 19,
+      "pay": 180.0
+    },
+    {
+      "symbol": "H1",
+      "kind": 20,
+      "pay": 180.0
+    },
+    {
+      "symbol": "H1",
+      "kind": 21,
+      "pay": 180.0
+    },
+    {
+      "symbol": "H1",
+      "kind": 22,
+      "pay": 180.0
+    },
+    {
+      "symbol": "H1",
+      "kind": 23,
+      "pay": 180.0
+    },
+    {
+      "symbol": "H1",
+      "kind": 24,
+      "pay": 180.0
+    },
+    {
+      "symbol": "H1",
+      "kind": 25,
+      "pay": 180.0
+    },
+    {
+      "symbol": "H2",
+      "kind": 5,
+      "pay": 1.8
+    },
+    {
+      "symbol": "H2",
+      "kind": 6,
+      "pay": 2.5
+    },
+    {
+      "symbol": "H2",
+      "kind": 7,
+      "pay": 3.5
+    },
+    {
+      "symbol": "H2",
+      "kind": 8,
+      "pay": 5.0
+    },
+    {
+      "symbol": "H2",
+      "kind": 9,
+      "pay": 8.0
+    },
+    {
+      "symbol": "H2",
+      "kind": 10,
+      "pay": 8.0
+    },
+    {
+      "symbol": "H2",
+      "kind": 11,
+      "pay": 18.0
+    },
+    {
+      "symbol": "H2",
+      "kind": 12,
+      "pay": 18.0
+    },
+    {
+      "symbol": "H2",
+      "kind": 13,
+      "pay": 40.0
+    },
+    {
+      "symbol": "H2",
+      "kind": 14,
+      "pay": 40.0
+    },
+    {
+      "symbol": "H2",
+      "kind": 15,
+      "pay": 40.0
+    },
+    {
+      "symbol": "H2",
+      "kind": 16,
+      "pay": 120.0
+    },
+    {
+      "symbol": "H2",
+      "kind": 17,
+      "pay": 120.0
+    },
+    {
+      "symbol": "H2",
+      "kind": 18,
+      "pay": 120.0
+    },
+    {
+      "symbol": "H2",
+      "kind": 19,
+      "pay": 120.0
+    },
+    {
+      "symbol": "H2",
+      "kind": 20,
+      "pay": 120.0
+    },
+    {
+      "symbol": "H2",
+      "kind": 21,
+      "pay": 120.0
+    },
+    {
+      "symbol": "H2",
+      "kind": 22,
+      "pay": 120.0
+    },
+    {
+      "symbol": "H2",
+      "kind": 23,
+      "pay": 120.0
+    },
+    {
+      "symbol": "H2",
+      "kind": 24,
+      "pay": 120.0
+    },
+    {
+      "symbol": "H2",
+      "kind": 25,
+      "pay": 120.0
+    },
+    {
+      "symbol": "H3",
+      "kind": 5,
+      "pay": 1.2
+    },
+    {
+      "symbol": "H3",
+      "kind": 6,
+      "pay": 1.8
+    },
+    {
+      "symbol": "H3",
+      "kind": 7,
+      "pay": 2.5
+    },
+    {
+      "symbol": "H3",
+      "kind": 8,
+      "pay": 3.5
+    },
+    {
+      "symbol": "H3",
+      "kind": 9,
       "pay": 6.0
     },
     {
-      "symbol": "H1",
-      "kind": 9,
-      "pay": 10.0
-    },
-    {
-      "symbol": "H1",
-      "kind": 10,
-      "pay": 10.0
-    },
-    {
-      "symbol": "H1",
-      "kind": 11,
-      "pay": 20.0
-    },
-    {
-      "symbol": "H1",
-      "kind": 12,
-      "pay": 20.0
-    },
-    {
-      "symbol": "H1",
-      "kind": 13,
-      "pay": 50.0
-    },
-    {
-      "symbol": "H1",
-      "kind": 14,
-      "pay": 50.0
-    },
-    {
-      "symbol": "H1",
-      "kind": 15,
-      "pay": 50.0
-    },
-    {
-      "symbol": "H1",
-      "kind": 16,
-      "pay": 150.0
-    },
-    {
-      "symbol": "H1",
-      "kind": 17,
-      "pay": 150.0
-    },
-    {
-      "symbol": "H1",
-      "kind": 18,
-      "pay": 150.0
-    },
-    {
-      "symbol": "H1",
-      "kind": 19,
-      "pay": 150.0
-    },
-    {
-      "symbol": "H1",
-      "kind": 20,
-      "pay": 150.0
-    },
-    {
-      "symbol": "H1",
-      "kind": 21,
-      "pay": 150.0
-    },
-    {
-      "symbol": "H1",
-      "kind": 22,
-      "pay": 150.0
-    },
-    {
-      "symbol": "H1",
-      "kind": 23,
-      "pay": 150.0
-    },
-    {
-      "symbol": "H1",
-      "kind": 24,
-      "pay": 150.0
-    },
-    {
-      "symbol": "H1",
-      "kind": 25,
-      "pay": 150.0
-    },
-    {
-      "symbol": "H2",
-      "kind": 5,
-      "pay": 1.5
-    },
-    {
-      "symbol": "H2",
-      "kind": 6,
-      "pay": 2.0
-    },
-    {
-      "symbol": "H2",
-      "kind": 7,
-      "pay": 3.0
-    },
-    {
-      "symbol": "H2",
-      "kind": 8,
-      "pay": 4.0
-    },
-    {
-      "symbol": "H2",
-      "kind": 9,
-      "pay": 7.0
-    },
-    {
-      "symbol": "H2",
-      "kind": 10,
-      "pay": 7.0
-    },
-    {
-      "symbol": "H2",
-      "kind": 11,
-      "pay": 15.0
-    },
-    {
-      "symbol": "H2",
-      "kind": 12,
-      "pay": 15.0
-    },
-    {
-      "symbol": "H2",
-      "kind": 13,
-      "pay": 35.0
-    },
-    {
-      "symbol": "H2",
-      "kind": 14,
-      "pay": 35.0
-    },
-    {
-      "symbol": "H2",
-      "kind": 15,
-      "pay": 35.0
-    },
-    {
-      "symbol": "H2",
-      "kind": 16,
-      "pay": 100.0
-    },
-    {
-      "symbol": "H2",
-      "kind": 17,
-      "pay": 100.0
-    },
-    {
-      "symbol": "H2",
-      "kind": 18,
-      "pay": 100.0
-    },
-    {
-      "symbol": "H2",
-      "kind": 19,
-      "pay": 100.0
-    },
-    {
-      "symbol": "H2",
-      "kind": 20,
-      "pay": 100.0
-    },
-    {
-      "symbol": "H2",
-      "kind": 21,
-      "pay": 100.0
-    },
-    {
-      "symbol": "H2",
-      "kind": 22,
-      "pay": 100.0
-    },
-    {
-      "symbol": "H2",
-      "kind": 23,
-      "pay": 100.0
-    },
-    {
-      "symbol": "H2",
-      "kind": 24,
-      "pay": 100.0
-    },
-    {
-      "symbol": "H2",
-      "kind": 25,
-      "pay": 100.0
-    },
-    {
-      "symbol": "H3",
-      "kind": 5,
-      "pay": 1.0
-    },
-    {
-      "symbol": "H3",
-      "kind": 6,
-      "pay": 1.5
-    },
-    {
-      "symbol": "H3",
-      "kind": 7,
-      "pay": 2.0
-    },
-    {
-      "symbol": "H3",
-      "kind": 8,
-      "pay": 3.0
-    },
-    {
-      "symbol": "H3",
-      "kind": 9,
-      "pay": 5.0
-    },
-    {
       "symbol": "H3",
       "kind": 10,
-      "pay": 5.0
+      "pay": 6.0
     },
     {
       "symbol": "H3",
       "kind": 11,
-      "pay": 10.0
+      "pay": 12.0
     },
     {
       "symbol": "H3",
       "kind": 12,
-      "pay": 10.0
+      "pay": 12.0
     },
     {
       "symbol": "H3",
       "kind": 13,
-      "pay": 25.0
+      "pay": 30.0
     },
     {
       "symbol": "H3",
       "kind": 14,
-      "pay": 25.0
+      "pay": 30.0
     },
     {
       "symbol": "H3",
       "kind": 15,
-      "pay": 25.0
+      "pay": 30.0
     },
     {
       "symbol": "H3",
       "kind": 16,
-      "pay": 75.0
+      "pay": 90.0
     },
     {
       "symbol": "H3",
       "kind": 17,
-      "pay": 75.0
+      "pay": 90.0
     },
     {
       "symbol": "H3",
       "kind": 18,
-      "pay": 75.0
+      "pay": 90.0
     },
     {
       "symbol": "H3",
       "kind": 19,
-      "pay": 75.0
+      "pay": 90.0
     },
     {
       "symbol": "H3",
       "kind": 20,
-      "pay": 75.0
+      "pay": 90.0
     },
     {
       "symbol": "H3",
       "kind": 21,
-      "pay": 75.0
+      "pay": 90.0
     },
     {
       "symbol": "H3",
       "kind": 22,
-      "pay": 75.0
+      "pay": 90.0
     },
     {
       "symbol": "H3",
       "kind": 23,
-      "pay": 75.0
+      "pay": 90.0
     },
     {
       "symbol": "H3",
       "kind": 24,
-      "pay": 75.0
+      "pay": 90.0
     },
     {
       "symbol": "H3",
       "kind": 25,
-      "pay": 75.0
+      "pay": 90.0
     },
     {
       "symbol": "M1",
       "kind": 5,
+      "pay": 1.0
+    },
+    {
+      "symbol": "M1",
+      "kind": 6,
+      "pay": 1.2
+    },
+    {
+      "symbol": "M1",
+      "kind": 7,
+      "pay": 1.8
+    },
+    {
+      "symbol": "M1",
+      "kind": 8,
+      "pay": 2.5
+    },
+    {
+      "symbol": "M1",
+      "kind": 9,
+      "pay": 5.0
+    },
+    {
+      "symbol": "M1",
+      "kind": 10,
+      "pay": 5.0
+    },
+    {
+      "symbol": "M1",
+      "kind": 11,
+      "pay": 10.0
+    },
+    {
+      "symbol": "M1",
+      "kind": 12,
+      "pay": 10.0
+    },
+    {
+      "symbol": "M1",
+      "kind": 13,
+      "pay": 25.0
+    },
+    {
+      "symbol": "M1",
+      "kind": 14,
+      "pay": 25.0
+    },
+    {
+      "symbol": "M1",
+      "kind": 15,
+      "pay": 25.0
+    },
+    {
+      "symbol": "M1",
+      "kind": 16,
+      "pay": 60.0
+    },
+    {
+      "symbol": "M1",
+      "kind": 17,
+      "pay": 60.0
+    },
+    {
+      "symbol": "M1",
+      "kind": 18,
+      "pay": 60.0
+    },
+    {
+      "symbol": "M1",
+      "kind": 19,
+      "pay": 60.0
+    },
+    {
+      "symbol": "M1",
+      "kind": 20,
+      "pay": 60.0
+    },
+    {
+      "symbol": "M1",
+      "kind": 21,
+      "pay": 60.0
+    },
+    {
+      "symbol": "M1",
+      "kind": 22,
+      "pay": 60.0
+    },
+    {
+      "symbol": "M1",
+      "kind": 23,
+      "pay": 60.0
+    },
+    {
+      "symbol": "M1",
+      "kind": 24,
+      "pay": 60.0
+    },
+    {
+      "symbol": "M1",
+      "kind": 25,
+      "pay": 60.0
+    },
+    {
+      "symbol": "L1",
+      "kind": 5,
+      "pay": 0.6
+    },
+    {
+      "symbol": "L1",
+      "kind": 6,
       "pay": 0.8
     },
     {
-      "symbol": "M1",
-      "kind": 6,
-      "pay": 1.0
-    },
-    {
-      "symbol": "M1",
+      "symbol": "L1",
       "kind": 7,
-      "pay": 1.5
+      "pay": 1.2
     },
     {
-      "symbol": "M1",
+      "symbol": "L1",
       "kind": 8,
-      "pay": 2.0
+      "pay": 1.8
     },
     {
-      "symbol": "M1",
+      "symbol": "L1",
       "kind": 9,
-      "pay": 4.0
+      "pay": 3.5
     },
     {
-      "symbol": "M1",
+      "symbol": "L1",
       "kind": 10,
-      "pay": 4.0
+      "pay": 3.5
     },
     {
-      "symbol": "M1",
+      "symbol": "L1",
       "kind": 11,
-      "pay": 8.0
+      "pay": 7.0
     },
     {
-      "symbol": "M1",
+      "symbol": "L1",
       "kind": 12,
-      "pay": 8.0
+      "pay": 7.0
     },
     {
-      "symbol": "M1",
+      "symbol": "L1",
       "kind": 13,
-      "pay": 20.0
+      "pay": 18.0
     },
     {
-      "symbol": "M1",
+      "symbol": "L1",
       "kind": 14,
-      "pay": 20.0
+      "pay": 18.0
     },
     {
-      "symbol": "M1",
+      "symbol": "L1",
       "kind": 15,
-      "pay": 20.0
+      "pay": 18.0
     },
     {
-      "symbol": "M1",
+      "symbol": "L1",
       "kind": 16,
-      "pay": 50.0
-    },
-    {
-      "symbol": "M1",
-      "kind": 17,
-      "pay": 50.0
-    },
-    {
-      "symbol": "M1",
-      "kind": 18,
-      "pay": 50.0
-    },
-    {
-      "symbol": "M1",
-      "kind": 19,
-      "pay": 50.0
-    },
-    {
-      "symbol": "M1",
-      "kind": 20,
-      "pay": 50.0
-    },
-    {
-      "symbol": "M1",
-      "kind": 21,
-      "pay": 50.0
-    },
-    {
-      "symbol": "M1",
-      "kind": 22,
-      "pay": 50.0
-    },
-    {
-      "symbol": "M1",
-      "kind": 23,
-      "pay": 50.0
-    },
-    {
-      "symbol": "M1",
-      "kind": 24,
-      "pay": 50.0
-    },
-    {
-      "symbol": "M1",
-      "kind": 25,
       "pay": 50.0
     },
     {
       "symbol": "L1",
+      "kind": 17,
+      "pay": 50.0
+    },
+    {
+      "symbol": "L1",
+      "kind": 18,
+      "pay": 50.0
+    },
+    {
+      "symbol": "L1",
+      "kind": 19,
+      "pay": 50.0
+    },
+    {
+      "symbol": "L1",
+      "kind": 20,
+      "pay": 50.0
+    },
+    {
+      "symbol": "L1",
+      "kind": 21,
+      "pay": 50.0
+    },
+    {
+      "symbol": "L1",
+      "kind": 22,
+      "pay": 50.0
+    },
+    {
+      "symbol": "L1",
+      "kind": 23,
+      "pay": 50.0
+    },
+    {
+      "symbol": "L1",
+      "kind": 24,
+      "pay": 50.0
+    },
+    {
+      "symbol": "L1",
+      "kind": 25,
+      "pay": 50.0
+    },
+    {
+      "symbol": "L2",
       "kind": 5,
       "pay": 0.5
     },
     {
-      "symbol": "L1",
+      "symbol": "L2",
       "kind": 6,
       "pay": 0.7
     },
     {
-      "symbol": "L1",
+      "symbol": "L2",
       "kind": 7,
       "pay": 1.0
     },
     {
-      "symbol": "L1",
+      "symbol": "L2",
       "kind": 8,
       "pay": 1.5
     },
     {
-      "symbol": "L1",
+      "symbol": "L2",
       "kind": 9,
       "pay": 3.0
     },
     {
-      "symbol": "L1",
+      "symbol": "L2",
       "kind": 10,
       "pay": 3.0
     },
     {
-      "symbol": "L1",
+      "symbol": "L2",
       "kind": 11,
       "pay": 6.0
     },
     {
-      "symbol": "L1",
+      "symbol": "L2",
       "kind": 12,
       "pay": 6.0
     },
     {
-      "symbol": "L1",
+      "symbol": "L2",
       "kind": 13,
       "pay": 15.0
     },
     {
-      "symbol": "L1",
+      "symbol": "L2",
       "kind": 14,
       "pay": 15.0
     },
     {
-      "symbol": "L1",
+      "symbol": "L2",
       "kind": 15,
       "pay": 15.0
     },
     {
-      "symbol": "L1",
+      "symbol": "L2",
       "kind": 16,
-      "pay": 40.0
-    },
-    {
-      "symbol": "L1",
-      "kind": 17,
-      "pay": 40.0
-    },
-    {
-      "symbol": "L1",
-      "kind": 18,
-      "pay": 40.0
-    },
-    {
-      "symbol": "L1",
-      "kind": 19,
-      "pay": 40.0
-    },
-    {
-      "symbol": "L1",
-      "kind": 20,
-      "pay": 40.0
-    },
-    {
-      "symbol": "L1",
-      "kind": 21,
-      "pay": 40.0
-    },
-    {
-      "symbol": "L1",
-      "kind": 22,
-      "pay": 40.0
-    },
-    {
-      "symbol": "L1",
-      "kind": 23,
-      "pay": 40.0
-    },
-    {
-      "symbol": "L1",
-      "kind": 24,
-      "pay": 40.0
-    },
-    {
-      "symbol": "L1",
-      "kind": 25,
-      "pay": 40.0
+      "pay": 35.0
     },
     {
       "symbol": "L2",
+      "kind": 17,
+      "pay": 35.0
+    },
+    {
+      "symbol": "L2",
+      "kind": 18,
+      "pay": 35.0
+    },
+    {
+      "symbol": "L2",
+      "kind": 19,
+      "pay": 35.0
+    },
+    {
+      "symbol": "L2",
+      "kind": 20,
+      "pay": 35.0
+    },
+    {
+      "symbol": "L2",
+      "kind": 21,
+      "pay": 35.0
+    },
+    {
+      "symbol": "L2",
+      "kind": 22,
+      "pay": 35.0
+    },
+    {
+      "symbol": "L2",
+      "kind": 23,
+      "pay": 35.0
+    },
+    {
+      "symbol": "L2",
+      "kind": 24,
+      "pay": 35.0
+    },
+    {
+      "symbol": "L2",
+      "kind": 25,
+      "pay": 35.0
+    },
+    {
+      "symbol": "L3",
       "kind": 5,
       "pay": 0.4
     },
     {
-      "symbol": "L2",
+      "symbol": "L3",
       "kind": 6,
       "pay": 0.6
     },
     {
-      "symbol": "L2",
+      "symbol": "L3",
       "kind": 7,
       "pay": 0.8
     },
     {
-      "symbol": "L2",
+      "symbol": "L3",
       "kind": 8,
       "pay": 1.2
     },
     {
-      "symbol": "L2",
+      "symbol": "L3",
       "kind": 9,
       "pay": 2.5
     },
     {
-      "symbol": "L2",
+      "symbol": "L3",
       "kind": 10,
       "pay": 2.5
     },
     {
-      "symbol": "L2",
+      "symbol": "L3",
       "kind": 11,
       "pay": 5.0
     },
     {
-      "symbol": "L2",
+      "symbol": "L3",
       "kind": 12,
       "pay": 5.0
     },
     {
-      "symbol": "L2",
+      "symbol": "L3",
       "kind": 13,
       "pay": 12.0
     },
     {
-      "symbol": "L2",
+      "symbol": "L3",
       "kind": 14,
       "pay": 12.0
     },
     {
-      "symbol": "L2",
+      "symbol": "L3",
       "kind": 15,
       "pay": 12.0
     },
     {
-      "symbol": "L2",
+      "symbol": "L3",
       "kind": 16,
       "pay": 30.0
     },
     {
-      "symbol": "L2",
+      "symbol": "L3",
       "kind": 17,
       "pay": 30.0
     },
     {
-      "symbol": "L2",
+      "symbol": "L3",
       "kind": 18,
       "pay": 30.0
     },
     {
-      "symbol": "L2",
+      "symbol": "L3",
       "kind": 19,
       "pay": 30.0
     },
     {
-      "symbol": "L2",
+      "symbol": "L3",
       "kind": 20,
       "pay": 30.0
     },
     {
-      "symbol": "L2",
+      "symbol": "L3",
       "kind": 21,
       "pay": 30.0
     },
     {
-      "symbol": "L2",
+      "symbol": "L3",
       "kind": 22,
       "pay": 30.0
     },
     {
-      "symbol": "L2",
+      "symbol": "L3",
       "kind": 23,
       "pay": 30.0
     },
     {
-      "symbol": "L2",
+      "symbol": "L3",
       "kind": 24,
       "pay": 30.0
     },
     {
-      "symbol": "L2",
+      "symbol": "L3",
       "kind": 25,
       "pay": 30.0
-    },
-    {
-      "symbol": "L3",
-      "kind": 5,
-      "pay": 0.3
-    },
-    {
-      "symbol": "L3",
-      "kind": 6,
-      "pay": 0.5
-    },
-    {
-      "symbol": "L3",
-      "kind": 7,
-      "pay": 0.7
-    },
-    {
-      "symbol": "L3",
-      "kind": 8,
-      "pay": 1.0
-    },
-    {
-      "symbol": "L3",
-      "kind": 9,
-      "pay": 2.0
-    },
-    {
-      "symbol": "L3",
-      "kind": 10,
-      "pay": 2.0
-    },
-    {
-      "symbol": "L3",
-      "kind": 11,
-      "pay": 4.0
-    },
-    {
-      "symbol": "L3",
-      "kind": 12,
-      "pay": 4.0
-    },
-    {
-      "symbol": "L3",
-      "kind": 13,
-      "pay": 10.0
-    },
-    {
-      "symbol": "L3",
-      "kind": 14,
-      "pay": 10.0
-    },
-    {
-      "symbol": "L3",
-      "kind": 15,
-      "pay": 10.0
-    },
-    {
-      "symbol": "L3",
-      "kind": 16,
-      "pay": 25.0
-    },
-    {
-      "symbol": "L3",
-      "kind": 17,
-      "pay": 25.0
-    },
-    {
-      "symbol": "L3",
-      "kind": 18,
-      "pay": 25.0
-    },
-    {
-      "symbol": "L3",
-      "kind": 19,
-      "pay": 25.0
-    },
-    {
-      "symbol": "L3",
-      "kind": 20,
-      "pay": 25.0
-    },
-    {
-      "symbol": "L3",
-      "kind": 21,
-      "pay": 25.0
-    },
-    {
-      "symbol": "L3",
-      "kind": 22,
-      "pay": 25.0
-    },
-    {
-      "symbol": "L3",
-      "kind": 23,
-      "pay": 25.0
-    },
-    {
-      "symbol": "L3",
-      "kind": 24,
-      "pay": 25.0
-    },
-    {
-      "symbol": "L3",
-      "kind": 25,
-      "pay": 25.0
     }
   ],
   "cascades": true,
@@ -900,57 +900,50 @@
   },
   "fs_per_scatter_in_fs": 1,
   "scatter_trigger_weights": {
-    "3": 0.0064441538,
-    "4": 0.000326899,
-    "5": 6.6326e-06
+    "3": 0.0044326323,
+    "4": 0.0001944069,
+    "5": 3.4105e-06
   },
   "mult_values": {
     "basegame": {
-      "2": 450.0,
-      "3": 300.0,
-      "4": 130.0,
-      "5": 60.0,
-      "6": 30.0,
-      "8": 15.0,
+      "1": 300.0,
+      "2": 400.0,
+      "3": 200.0,
+      "4": 60.0,
+      "5": 30.0,
       "10": 8.0,
-      "15": 4.0,
-      "20": 2.0,
-      "50": 1.0
+      "20": 2.0
     },
     "freegame": {
-      "2": 250.0,
+      "1": 150.0,
+      "2": 300.0,
       "3": 250.0,
-      "4": 180.0,
-      "5": 130.0,
-      "6": 80.0,
-      "8": 50.0,
-      "10": 30.0,
-      "15": 15.0,
-      "20": 8.0,
-      "50": 2.0
+      "4": 120.0,
+      "5": 90.0,
+      "10": 50.0,
+      "20": 20.0,
+      "50": 5.0
     },
     "wincap": {
-      "2": 500.0,
+      "1": 150.0,
+      "2": 600.0,
       "3": 750.0,
-      "4": 720.0,
-      "5": 650.0,
-      "6": 480.0,
-      "8": 400.0,
-      "10": 300.0,
-      "15": 225.0,
-      "20": 160.0,
-      "50": 100.0
+      "4": 480.0,
+      "5": 450.0,
+      "10": 500.0,
+      "20": 400.0,
+      "50": 250.0
     }
   },
   "buy": {
-    "cost": 69.0,
+    "cost": 59.0,
     "spins": 10
   },
   "targets": {
     "wincap_rtp": 0.001,
-    "freegame_rtp": 0.5478,
-    "freegame_hr": 130.72,
-    "basegame_rtp": 0.4112,
-    "basegame_hr": 4.647
+    "freegame_rtp": 0.3652,
+    "freegame_hr": 152.79,
+    "basegame_rtp": 0.5938,
+    "basegame_hr": 3.327
   }
 }
