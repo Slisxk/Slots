@@ -307,6 +307,32 @@ class Moteur:
             out[:, s] = np.where(sym == s, gain, 0.0).sum(axis=1)
         return out
 
+    def fs_initiaux(self, nb_trophees):
+        table = self.p["table_fs"]
+        out = np.zeros(len(nb_trophees), dtype=np.int64)
+        for seuil, fs in table:                 # table triée : le dernier seuil couvre « et plus »
+            out[nb_trophees >= seuil] = fs
+        return out
+
+    def sessions_fs(self, fs_init, plafond):
+        """Joue des sessions de free spins. Renvoie (gain total, nb de FS joués, gains par symbole)."""
+        n = len(fs_init)
+        total = np.zeros(n)
+        restant = fs_init.astype(float).copy()
+        joues = np.zeros(n, dtype=np.int64)
+        par_symbole = np.zeros(len(self.p["codes"]))
+        actifs = np.flatnonzero(restant > 0)
+        while actifs.size:
+            g, tr, _, ps = self.spin(actifs.size, "fs")
+            total[actifs] += g
+            par_symbole += ps
+            joues[actifs] += 1
+            restant[actifs] += tr * self.p["fs_par_trophee"] - 1
+            fini = (restant[actifs] < 1) | (total[actifs] >= plafond) | \
+                   (joues[actifs] >= MAX_FS_PAR_SESSION)
+            actifs = actifs[~fini]
+        return np.minimum(total, plafond), joues, par_symbole
+
 
 # --------------------------------------------------------------------------- #
 # Simulation complète
