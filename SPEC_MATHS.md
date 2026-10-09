@@ -17,13 +17,14 @@
 | Gains | **Clusters** : 5 symboles identiques ou plus, reliés horizontalement ou verticalement (pas en diagonale) |
 | Cascades | Oui : les clusters gagnants disparaissent, les symboles tombent, de nouveaux arrivent par le haut, et on recommence tant qu'il y a un gain |
 | Feature principale | **Globe** : ses 8 cases voisines deviennent des wilds multiplicateurs |
-| Free spins | 3 / 4 / 5+ symboles bonus → 10 / 12 / 15 FS ; pendant les FS, chaque symbole bonus = **+1 FS** |
-| Bonus buy | 59 × la mise → 10 free spins |
-| RTP | 96,00 % (mode base et mode bonus buy) |
+| Bonus | **3 bonus** : 3 symboles bonus → Bonus 1 (10 FS) ; 4 → Bonus 2 « super » (12 FS) ; 5 → Bonus 3, **caché** (5 FS, un globe garanti à chaque FS). Pendant les FS, chaque symbole bonus = **+1 FS** |
+| Spins boostés | 1,25 × la mise : bonus environ 1,6 fois plus fréquents (mode `boost`) |
+| Bonus buy | Bonus 1 : 59 × la mise ; Bonus 2 : 160 × la mise ; le bonus caché ne s'achète pas |
+| RTP | 96,00 % dans les 4 modes (`base`, `boost`, `bonus`, `super`) |
 | Max win | **10 000 × la mise** |
-| Volatilité | Élevée : écart-type de 25,7 × la mise par tour ; toutes les limites « 3 étoiles » du SDK sont respectées |
+| Volatilité | Élevée : écart-type de 25 × la mise par tour en jeu de base ; toutes les limites « 3 étoiles » du SDK sont respectées dans les 4 modes |
 | Fréquence de gain | 30,0 % des tours |
-| Fréquence du bonus | 1 tour sur 153 |
+| Fréquence des bonus (jeu de base) | Bonus 1 : 1 tour sur 192 ; Bonus 2 : 1 sur 3 300 ; bonus caché : 1 sur 87 000 |
 
 *(Le détail est en section 8.)*
 
@@ -169,48 +170,53 @@ Dans le bonus caché, le `board` de chaque `reveal` des free spins contient touj
 
 ## 8. Statistiques
 
-Elles sont calculées sur les fichiers publiés (40 000 résultats par mode), avec les fonctions de vérification du math SDK. Pour la publication, il faudra relancer avec 100 000 résultats ou plus par mode.
+Elles sont calculées sur les fichiers générés (20 000 résultats par mode), avec les fonctions de vérification du math SDK. Pour la publication, il faudra relancer avec 100 000 résultats ou plus par mode : les chiffres bougeront un peu, le RTP reste exactement 96,00 %.
 
-**Comment les poids sont calculés.** Les poids des résultats viennent d'une **pondération naturelle** (`ponderation.py`), pas de l'optimiseur Rust du SDK : avec les réglages de l'exemple officiel, celui-ci déformait fortement la distribution des gains. La pondération naturelle garde les vraies probabilités du jeu. Elle n'ajuste que deux choses :
-- le RTP, pour qu'il tombe exactement sur 96,00 % ;
-- en bonus buy, les gains de 2 360× et plus, rendus environ 13 fois plus rares pour respecter la limite « 3 étoiles » `etl40b`.
+**Comment les poids sont calculés.** Les poids des résultats viennent d'une **pondération naturelle** (`ponderation.py`), pas de l'optimiseur Rust du SDK, qui déformait fortement la distribution des gains. Chaque catégorie de résultats (chaque bonus, les gains sans bonus, les tours perdants) garde la probabilité réelle mesurée par la feuille de calcul. Ensuite :
+- le RTP est ajusté pour tomber exactement sur 96,00 %, par la plus petite correction possible des gains sans bonus (bruit des résultats) ;
+- en bonus buy, les gains de 2 360× et plus (Bonus 1) ou de 6 400× et plus (Bonus 2) sont rendus environ 9 et 6 fois plus rares, pour respecter la limite « 3 étoiles » `etl40b`.
 
-| | Mode `base` (1×) | Mode `bonus` (59×) |
-|---|---|---|
-| RTP | **96,00 %** | **96,00 %** |
-| Fréquence de gain | 30,0 % des tours (1 sur 3,34) | 100 % |
-| Gain moyen | 0,96 × la mise | 56,6 × la mise |
-| Écart-type | 25,7 × la mise | 228 × la mise |
-| Max win (10 000×) | ≈ 1 tour sur 10 000 000 | ≈ 1 achat sur 92 000 |
+| | `base` (1×) | `boost` (1,25×) | `bonus` (59×) | `super` (160×) |
+|---|---|---|---|---|
+| RTP | **96,00 %** | **96,00 %** | **96,00 %** | **96,00 %** |
+| Gain moyen (× la mise de base) | 0,96 | 1,20 | 56,6 | 153,6 |
+| Fréquence de gain | 30,0 % | 29,9 % | 99,9 % | 100 % |
+| Écart-type (× la mise) | 25,4 | 30,1 | 225 | 500 |
+| Gain médian | 0 | 0 | 7,7× | 10,1× |
+| Max win (10 000×) | 1 tour sur 10 000 000 | 1 sur 8 000 000 | 1 achat sur 170 000 | 1 achat sur 41 000 |
+
+**Fréquence et valeur des bonus**
+
+| | `base` | `boost` | Gain moyen du bonus |
+|---|---|---|---|
+| Bonus 1 « Free spins » (3 symboles bonus) | 1 tour sur 192 | 1 sur 116 | ≈ 56× |
+| Bonus 2 « Super free spins » (4) | 1 sur 3 300 | 1 sur 1 660 | ≈ 150× |
+| Bonus 3, caché (5) | 1 sur 87 000 | 1 sur 32 000 | ≈ 1 700× |
+
+Le bonus caché paie presque toujours gros (gain médian ≈ 1 600×), car chacun de ses free spins a un globe. Les deux autres bonus sont très « loterie » : la plupart rapportent entre 5× et 20× la mise, et les gros gains viennent des globes.
 
 **Limites « 3 étoiles » du SDK** (`utils/rgs_verification.py`), toutes respectées :
 
-| Critère | Limite | Base | Bonus |
-|---|---|---|---|
-| `etl40b` (espérance des gains ≥ 40× le coût) | ≤ 0,9 | 0,594 | 0,800 |
-| `etl10k` (espérance des gains ≥ 10 000×) | ≤ 0,8 | 0,001 | 0,109 |
-| `cvar` (gain moyen des 0,1 % meilleurs tours, en × le coût) | ≤ 800 | 569 | 43,5 |
-| `prob5k` / `prob10k` | ≤ 1 % / 0,5 % | ≈ 0 | ≈ 0 |
-| RTP | ≤ 96,7 % | 96,00 % | 96,00 % |
-
-**Mode base, détail**
-- Free spins : 1 tour sur 153, environ 26 FS par bonus, 56× la mise en moyenne. Ils pèsent environ 36,7 % du RTP.
-- Jeu de base sans bonus : 29,3 % des tours gagnent, 2× la mise en moyenne. Il pèse environ 59,2 % du RTP.
+| Critère | Limite | `base` | `boost` | `bonus` | `super` |
+|---|---|---|---|---|---|
+| `etl40b` (espérance des gains ≥ 40× le coût) | ≤ 0,9 | 0,599 | 0,820 | 0,880 | 0,880 |
+| `etl10k` (espérance des gains ≥ 10 000×) | ≤ 0,8 | 0,001 | 0,001 | 0,059 | 0,244 |
+| `cvar` (gain moyen des 0,1 % meilleurs tours, en × le coût) | ≤ 800 | 579 | 607 | 43 | 38 |
+| `prob5k` / `prob10k` | ≤ 1 % / 0,5 % | ≈ 0 | ≈ 0 | ≈ 0 | 0,1 % / ≈ 0 |
+| RTP | ≤ 96,7 % | 96,00 % | 96,00 % | 96,00 % | 96,00 % |
 
 **Distribution des gains par tour (% des tours, gains en × la mise de base)**
 
-| Gain | Mode base | Mode bonus |
-|---|---|---|
-| 0 | 70,0 % | 0 % |
-| 0–1× | 18,1 % | 0,8 % |
-| 1–5× | 10,9 % | 26,0 % |
-| 5–20× | 0,80 % | 61,3 % |
-| 20–100× | 0,061 % | 4,2 % |
-| 100–1 000× | 0,082 % | 5,9 % |
-| 1 000–10 000× | 0,013 % | 1,7 % |
-| 10 000× (max win) | 0,00001 % | 0,001 % |
-
-En bonus buy, la plupart des achats rapportent entre 5× et 20× la mise, et les gros gains viennent des globes. Le gain médian d'un achat est d'environ 7,6× la mise, pour un coût de 59×.
+| Gain | `base` | `boost` | `bonus` | `super` |
+|---|---|---|---|---|
+| 0 | 70,0 % | 70,1 % | 0,13 % | 0,04 % |
+| 0–1× | 18,0 % | 17,8 % | 0,71 % | 0,27 % |
+| 1–5× | 11,1 % | 11,0 % | 25,8 % | 14,8 % |
+| 5–20× | 0,75 % | 0,91 % | 61,4 % | 61,7 % |
+| 20–100× | 0,049 % | 0,066 % | 4,4 % | 6,8 % |
+| 100–1 000× | 0,083 % | 0,110 % | 5,8 % | 11,1 % |
+| 1 000–10 000× | 0,019 % | 0,024 % | 1,7 % | 5,3 % |
+| 10 000× (max win) | 0,00001 % | 0,00001 % | 0,0006 % | 0,0024 % |
 
 Pour la célébration des gains, `winLevel` (de 1 à 10) suit les seuils du SDK :
 - **par spin** : 1 = moins de 0,1×, 2 = jusqu'à 1×, 3 = 1–2×, 4 = 2–5×, 5 = 5–15×, 6 = 15–30×, 7 = 30–50×, 8 = 50–100×, 9 = 100× jusqu'au max win, 10 = max win ;
@@ -220,7 +226,7 @@ Pour la célébration des gains, `winLevel` (de 1 à 10) suit les seuils du SDK 
 
 ## 9. Exemples réels de tours
 
-Ce sont des extraits réels des fichiers générés.
+Ce sont des extraits réels des fichiers générés. Les exemples 9.1 et 9.2 viennent d'une génération précédente (mêmes règles, mêmes événements, bandes différentes) ; 9.3 et 9.4 de la génération actuelle.
 
 ### 9.1 Globe + cascade : gain de 700,40× (`payoutMultiplier` = 70040)
 
@@ -265,17 +271,38 @@ Le globe tombe sur le rouleau 4 (`reel` 3, `row` 4) et pose 8 wilds multiplicate
 }
 ```
 
-### 9.3 Free spins déclenchés : gain de 153,40× (résumé)
+### 9.3 Bonus 1 déclenché : gain de 186,40× (résumé, `id` 1978 du mode `base`)
 
 ```
-{"index": 0, "type": "reveal", "board": [[{"name": "L2"}, {"name": "L1"}, {"name": "L3"}, {"name": "L2"}, {"name": "L1"}, {"name": "L2"}, {"name": "L1"}], [{"name": "L3"}, {"name": "H1"}, {"name": "M1"}, {"name": "L2"},  …
+{"index": 0, "type": "reveal", "board": [[{"name": "L1"}, {"name": "BN", "scatter": true}, {"name": "H3"}, …
 {"index": 1, "type": "setTotalWin", "amount": 0}
-{"index": 2, "type": "freeSpinTrigger", "totalFs": 10, "positions": [{"reel": 1, "row": 5}, {"reel": 2, "row": 5}, {"reel": 3, "row": 5}]}
+{"index": 2, "type": "freeSpinTrigger", "totalFs": 10, "positions": [{"reel": 0, "row": 1}, {"reel": 3, "row": 3}, {"reel": 4, "row": 2}], "bonus": 1}
 {"index": 3, "type": "updateFreeSpin", "amount": 0, "total": 10}
-… (10 free spins : updateFreeSpin → reveal → [globeMultipliers] → [winInfo → updateTumbleWin → tumbleBoard …] → [setWin] → setTotalWin → [freeSpinRetrigger]) …
-{"index": 31, "type": "freeSpinRetrigger", "totalFs": 11, "positions": [{"reel": 0, "row": 2}]}
-{"index": 46, "type": "freeSpinEnd", "amount": 15340, "winLevel": 7}
-{"index": 47, "type": "finalWin", "amount": 15340}
+… (chaque FS : updateFreeSpin → reveal → [globeMultipliers] → [winInfo → updateTumbleWin → tumbleBoard …] → [setWin] → setTotalWin → [freeSpinRetrigger]) …
+{"index": 6, "type": "freeSpinRetrigger", "totalFs": 11, "positions": [{"reel": 1, "row": 2}]}
+{"index": 17, "type": "freeSpinRetrigger", "totalFs": 13, "positions": [{"reel": 1, "row": 5}, {"reel": 3, "row": 3}]}
+… (8 autres retriggers, jusqu'à 22 FS) …
+{"index": 121, "type": "freeSpinEnd", "amount": 18640, "winLevel": 7}
+{"index": 122, "type": "finalWin", "amount": 18640}
+```
+
+### 9.4 Bonus caché : gain de 1 562,70× (résumé, `id` 61 du mode `base`)
+
+5 symboles bonus déclenchent le bonus 3 (`"bonus": 3`). Chaque `reveal` des free spins contient un globe (ici une seule fois par spin), suivi de son `globeMultipliers` (petites valeurs, ×1 à ×4). Deux retriggers portent la session à 7 FS.
+
+```
+{"index": 2, "type": "freeSpinTrigger", "totalFs": 5, "positions": [{"reel": 0, "row": 2}, {"reel": 1, "row": 1}, {"reel": 2, "row": 1}, {"reel": 3, "row": 4}, {"reel": 4, "row": 4}], "bonus": 3}
+{"index": 3, "type": "updateFreeSpin", "amount": 0, "total": 5}
+{"index": 4, "type": "reveal", "gameType": "freegame", …}            globe en (reel 1, row 1)
+{"index": 5, "type": "globeMultipliers", …}                          multis 2, 2, 1, 1, 1
+{"index": 9, "type": "setWin", "amount": 9040, "winLevel": 8}
+… FS 2 et 3 : 8,80× et 42,40× …
+{"index": 30, "type": "freeSpinRetrigger", "totalFs": 6, "positions": [{"reel": 1, "row": 2}]}
+… FS 4 : 61,10× ; FS 5 : 648,00× ; FS 6 : 88,00× …
+{"index": 55, "type": "freeSpinRetrigger", "totalFs": 7, "positions": [{"reel": 1, "row": 5}]}
+… FS 7 : 624,00× …
+{"index": 64, "type": "freeSpinEnd", "amount": 156270, "winLevel": 8}
+{"index": 65, "type": "finalWin", "amount": 156270}
 ```
 
 ---
@@ -287,7 +314,8 @@ D'après les règles d'approbation de Stake Engine ([stakeengine.org/docs/approv
 - **Mineurs** : rien qui puisse attirer les mineurs. Pas d'enfants ni de personnages enfantins, pas de thème scolaire ou enfantin.
 - **Contenu** : pas de contenu choquant ou de mauvais goût, et une qualité visuelle suffisante.
 - **Jeu sans état** : chaque tour est indépendant, sans jackpot, sans quitte-ou-double ni encaissement anticipé. Les maths respectent déjà cette règle.
-- **Page de règles** : le jeu doit avoir une page de règles claire, à partir de la section 3, avec la paytable, le RTP de 96,00 % et le max win de 10 000x.
+- **Page de règles** : le jeu doit avoir une page de règles claire, à partir de la section 3, avec la paytable, le RTP de 96,00 % (identique dans les 4 modes : jeu de base, spins boostés et les deux bonus buy), le max win de 10 000x, et la description des 3 bonus.
+- **Bonus caché** : « caché » veut dire qu'il n'est pas mis en avant à l'écran (pas de bouton, pas de compteur). Il doit quand même être décrit dans la page de règles (5 symboles bonus, 5 FS, globe garanti) : un joueur doit pouvoir savoir qu'il existe.
 
 ---
 
@@ -297,6 +325,6 @@ D'après les règles d'approbation de Stake Engine ([stakeengine.org/docs/approv
 |---|---|
 | `modele_maths/modele_maths.xlsx` + `simulateur.py` | Conception et réglage des maths (feuille de calcul + simulateur) |
 | `stake_math/games/0_0_globe/` | Le jeu pour le math SDK de Stake Engine (`params.json`, bandes `reels/*.csv`, logique Python) |
-| `<math-sdk>/games/0_0_globe/library/publish_files/` | **À déposer sur Stake Engine** : `index.json`, `books_base.jsonl.zst`, `books_bonus.jsonl.zst`, `lookUpTable_base_0.csv`, `lookUpTable_bonus_0.csv` (générés par `run.py`) |
-| `stake_math/sortie/config_fe_0_0_globe.json` | Config pour le front-end : symboles, paytable, bandes d'animation des rouleaux, modes (copie de `<math-sdk>/games/0_0_globe/library/configs/`) |
-| `stake_math/sortie/statistiques/` | Statistiques détaillées produites par le SDK |
+| `<math-sdk>/games/0_0_globe/library/publish_files/` | **À déposer sur Stake Engine** : `index.json`, et pour chacun des 4 modes (`base`, `boost`, `bonus`, `super`) `books_<mode>.jsonl.zst` et `lookUpTable_<mode>_0.csv` (générés par `run.py`) |
+| `stake_math/sortie/config_fe_0_0_globe.json` | Config pour le front-end : symboles, paytable, bandes d'animation des rouleaux, les 4 modes et leurs coûts (copie de `<math-sdk>/games/0_0_globe/library/configs/`) |
+| `stake_math/sortie/statistiques/` | Statistiques produites par le SDK |

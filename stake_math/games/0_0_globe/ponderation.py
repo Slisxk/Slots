@@ -11,7 +11,8 @@ la distribution des gains ; ici on garde la distribution NATURELLE du jeu, mesur
     wincap_rtp du RTP. Tous les résultats d'une case ont le même poids ;
   * modes bonus buy : tous les résultats ont le même poids ;
   * puis le RTP est ajusté exactement par un « basculement exponentiel » (poids × exp(θ·gain)) : le plus
-    petit écart possible à la distribution naturelle. Il ne corrige que le bruit des books (quelques %) ;
+    petit écart possible à la distribution naturelle. Il ne corrige que le bruit des books. Dans les modes
+    base / boost, il ne touche que les gains sans bonus, dont la moyenne est la plus bruitée ;
   * limites « 3 étoiles » du SDK (utils/rgs_verification.py) : si l'espérance des gains >= 40x le coût
     du mode (etl40b) ou >= 10 000x (etl10k) dépasse sa limite, seuls ces gros gains sont rendus plus
     rares, juste assez pour passer, le RTP restant exact.
@@ -80,10 +81,11 @@ def _ecrire(path, poids_par_id, books):
     return sum(entiers[i] * books[i][1] for i in ids) / sum(entiers.values())
 
 
-def _ajuster(books, w0, cible_ev, cout, p_wc):
+def _ajuster(books, w0, cible_ev, cout, p_wc, ajustables=None):
     """Part commune à tous les modes. w0 : poids naturels des résultats hors max win (somme 1).
-    Poids finaux w_i ∝ w0_i · exp(θ·p_i) × réduction de la queue (l40, l10k) : le basculement
-    exponentiel est le plus petit écart possible à la distribution naturelle qui donne le RTP exact.
+    Seuls les résultats « ajustables » (tous par défaut) sont modifiés : w_i ∝ w0_i · exp(θ·p_i) ×
+    réduction de la queue (l40, l10k), leur masse totale restant fixe. Le basculement exponentiel est
+    le plus petit écart possible à la distribution naturelle qui donne le RTP exact.
     Renvoie (poids par id, détail)."""
     ids = [i for i in w0 if w0[i] > 0]
     wc = [i for i, b in books.items() if b[0] == "wincap"]
@@ -92,14 +94,23 @@ def _ajuster(books, w0, cible_ev, cout, p_wc):
         p_wc = 0.0
     p_reste = 1 - p_wc
     cible = (cible_ev - p_wc * moy_wc) / p_reste
-    pays = np.array([books[i][1] for i in ids])
-    base = np.array([w0[i] for i in ids])
+    tot0 = sum(w0[i] for i in ids)
+    adj = [i for i in ids if ajustables is None or i in ajustables]
+    fixes = [i for i in ids if not (ajustables is None or i in ajustables)]
+    pf = np.array([books[i][1] for i in fixes])
+    wf = np.array([w0[i] / tot0 for i in fixes])
+    masse = 1 - wf.sum()
+    cible_adj = (cible - float(wf @ pf)) / masse
+    pays = np.array([books[i][1] for i in adj])
+    base = np.array([w0[i] for i in adj])
     base /= base.sum()
     seuil40 = 40 * cout
     p_max = pays.max()
-    if not (pays.min() < cible < p_max):
-        raise ValueError(f"RTP impossible : gain moyen cible {cible:.3f} hors de [{pays.min()}, {p_max}]")
+    if not (pays.min() < cible_adj < p_max):
+        raise ValueError(f"RTP impossible : gain moyen cible {cible_adj:.3f} hors de [{pays.min()}, {p_max}]")
     q40, q10 = pays >= seuil40, pays >= 10_000
+    f40 = float(wf[pf >= seuil40] @ pf[pf >= seuil40])
+    f10 = float(wf[pf >= 10_000] @ pf[pf >= 10_000])
 
     def bascule(l40, l10k):
         f = base * np.exp(np.where(q40, l40, 0.0) + np.where(q10, l10k, 0.0))
@@ -108,26 +119,25 @@ def _ajuster(books, w0, cible_ev, cout, p_wc):
             e = f * np.exp(theta * (pays - (p_max if theta > 0 else 0.0)))
             return e / e.sum()
 
-        theta = _bisection(lambda t: float(poids(t) @ pays) - cible, -1.0, 1.0, 200)
+        theta = _bisection(lambda t: float(poids(t) @ pays) - cible_adj, -1.0, 1.0, 200)
         return poids(theta), theta
 
     def evaluer(l40, l10k):
         w, _ = bascule(l40, l10k)
-        e40 = (p_wc * moy_wc if moy_wc >= seuil40 else 0.0) + p_reste * float(w[q40] @ pays[q40])
-        e10 = (p_wc * moy_wc if moy_wc >= 10_000 else 0.0) + p_reste * float(w[q10] @ pays[q10])
+        e40 = (p_wc * moy_wc if moy_wc >= seuil40 else 0.0) + p_reste * (f40 + masse * float(w[q40] @ pays[q40]))
+        e10 = (p_wc * moy_wc if moy_wc >= 10_000 else 0.0) + p_reste * (f10 + masse * float(w[q10] @ pays[q10]))
         return e40, e10
 
     l40, l10k = _contraindre(evaluer)
     w, theta = bascule(l40, l10k)
-    poids = {i: p_reste * float(wi) for i, wi in zip(ids, w)}
+    poids = {i: p_reste * masse * float(wi) for i, wi in zip(adj, w)}
+    poids.update({i: p_reste * float(wi) for i, wi in zip(fixes, wf)})
     for i in wc:
         poids[i] = p_wc / len(wc)
     e40, e10 = evaluer(l40, l10k)
-    detail = {"wincap": round(p_wc, 10), "moyenne_naturelle": round(float(base @ pays), 4),
-              "moyenne_cible": round(cible, 4), "theta": theta,
-              "hit_naturel": round(float(base[pays > 0].sum()) * p_reste + p_wc, 4),
-              "hit_final": round(float(w[pays > 0].sum()) * p_reste + p_wc, 4),
-              "etl40b": round(e40, 4), "etl10k": round(e10, 4),
+    detail = {"wincap": round(p_wc, 10),
+              "moyenne_naturelle": round(float(base @ pays), 4), "moyenne_cible": round(float(cible_adj), 4),
+              "theta": theta, "etl40b": round(float(e40), 4), "etl10k": round(float(e10), 4),
               "gros_gains_rendus_plus_rares_x": round(math.exp(-l40), 2),
               "max_win_rendu_plus_rare_x": round(math.exp(-l10k), 2)}
     return poids, detail
@@ -164,7 +174,9 @@ def _mode_spin(books, cible_ev, cout, p_wc, joint, hit):
     for cle, pr in list(p_case.items()) + [("basegame", p_bg), ("0", p_0)]:
         for i in par_cle.get(cle, []):
             w0[i] = pr / len(par_cle[cle]) / (1 - p_wc)
-    poids, detail = _ajuster(books, w0, cible_ev, cout, p_wc)
+    # L'écart de RTP vient surtout du bruit des books « basegame » (les rares spins avec globe) : seuls
+    # ces résultats sont ajustés ; les bonus gardent exactement leur distribution naturelle.
+    poids, detail = _ajuster(books, w0, cible_ev, cout, p_wc, ajustables=set(par_cle["basegame"]))
     detail.update({f"bonus{k}": round(sum(v for (c, kk), v in p_case.items() if kk == k), 8)
                    for k in range(1, len(joint) + 1)})
     return poids, detail

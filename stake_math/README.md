@@ -56,7 +56,7 @@ stake_math/
    - `lookUpTable_*_0.csv` ;
    - `index.json`.
 
-   Les stats détaillées sont dans `library/*_full_statistics.xlsx`.
+   Les stats sont dans `library/statistics_summary.json` et `library/stats_summary.json`.
 
 ## Ce que le front-end doit gérer
 
