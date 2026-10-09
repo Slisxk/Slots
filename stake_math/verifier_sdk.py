@@ -38,7 +38,7 @@ def main():
     from src.calculations.ways import Ways
 
     p = simulateur.load_params(classeur)
-    p["poids_base"][p["types"].index("GLOBE")] = np.round(p["poids_base"].sum(axis=0) / 25)  # ~1 globe/grille
+    p["poids"]["base"][p["types"].index("GLOBE")] = np.round(p["poids"]["base"].sum(axis=0) / 25)  # ~1 globe/grille
     config = GameConfig()
     top = PARAMS["top_symbol"]
     ok = True
@@ -125,6 +125,7 @@ def main():
         print(f"{gain:7} + {mode:10} : {n_grilles} grilles ({avec_globe} avec globe), "
               f"gain total SDK = feuille -> {etat}")
     ok &= verifier_cascades(p, config, simulateur, GameState, n_grilles)
+    ok &= verifier_globe_garanti(classeur, config, simulateur, GameState, n_grilles)
     sys.exit(0 if ok else 1)
 
 
@@ -139,7 +140,7 @@ def verifier_cascades(p, config, simulateur, GameState, n_grilles):
     ok = True
     n_sdk = max(4000, n_grilles * 3)
     # Globe sur ~1 grille sur 4 : assez pour tester les cascades avec multis, sans saturer le max win
-    poids_test = p["poids_base"].copy()
+    poids_test = p["poids"]["base"].copy()
     poids_test[p["types"].index("GLOBE")] = np.round(poids_test.sum(axis=0) / 100)
     for mode in ("WILD_ADD", "GLOBAL_SUM"):
         p["mode"] = mode
@@ -157,17 +158,17 @@ def verifier_cascades(p, config, simulateur, GameState, n_grilles):
                            for k in range(1, m0.pay_taille.shape[1]) if m0.pay_taille[i][k] > 0}
         # Mêmes poids des deux côtés : bandes construites depuis la feuille (globes fréquents)
         rng = random.Random(1)
-        p["poids_base"] = poids_test.copy()
-        L = int(p["poids_base"].sum(axis=0).max())
+        p["poids"]["base"] = poids_test.copy()
+        L = int(p["poids"]["base"].sum(axis=0).max())
         sc = p["codes"][p["types"].index("SCATTER")]
-        config.reels["TEST"] = [exporter.bande(p["poids_base"][:, r], p["codes"], L, p["rows"], sc, rng)
+        config.reels["TEST"] = [exporter.bande(p["poids"]["base"][:, r], p["codes"], L, p["rows"], sc, rng)
                                 for r in range(5)]
         gs = GameState(config)
         gs.betmode, gs.criteria = "base", "basegame"
         conds = gs.get_current_distribution_conditions()
         conds_save = (dict(conds["reel_weights"]), conds.get("mult_values"))
         conds["reel_weights"] = {config.basegame_type: {"TEST": 1}}
-        mprob = {float(v): w for v, w in zip(p["multi_val"], p["multi_w_base"])}
+        mprob = {float(v): w for v, w in zip(p["multi_val"], p["multi_w"]["base"])}
         conds["mult_values"] = {config.basegame_type: mprob, config.freegame_type: mprob}
         wins = []
         for i in range(n_sdk):
@@ -191,6 +192,42 @@ def verifier_cascades(p, config, simulateur, GameState, n_grilles):
         print(f"CASCADES {mode:10} : gain moyen SDK {wins.mean():.4f} / feuille {notre.mean():.4f} "
               f"(écart {diff / err:+.1f} σ) ; spins gagnants {hit_sdk:.2%} / {hit_nous:.2%} -> "
               f"{'OK' if bon else 'ÉCART'}")
+    return ok
+
+
+def verifier_globe_garanti(classeur, config, simulateur, GameState, n_grilles):
+    """Bonus avec globe garanti : compare statistiquement un free spin du SDK (bandes FRk exportées,
+    ensure_globe, cascades) et de la feuille (_tirage avec globe garanti)."""
+    p = simulateur.load_params(classeur)          # paramètres réels (pas ceux modifiés pour les tests)
+    if p["mode_gain"] != "CLUSTER" or config.win_type != "cluster":
+        return True
+    ok = True
+    for k, b in enumerate(p["bonus"], 1):
+        if not b["globe_garanti"]:
+            continue
+        gs = GameState(config)
+        gs.betmode, gs.criteria = "base", "basegame"
+        gs.reset_seed(0)
+        n_sdk = max(4000, n_grilles * 2)
+        wins, globes = [], 0
+        for i in range(n_sdk):
+            gs.reset_seed(10_000 + i)
+            gs.reset_book()
+            gs.gametype, gs.bonus = config.freegame_type, k
+            gs.draw_board(emit_event=False)
+            globes += bool(gs.globe_positions())
+            gs.play_board()
+            wins.append(gs.win_manager.spin_win)
+        cap = config.wincap
+        wins = np.minimum(np.array(wins), cap)
+        m = simulateur.Moteur(p, np.random.default_rng(13))
+        notre = np.minimum(m.spin(100_000, f"fs{k}")[0], cap)
+        diff = wins.mean() - notre.mean()
+        err = np.sqrt(wins.var() / len(wins) + notre.var() / len(notre))
+        bon = abs(diff) <= 3 * err and globes == n_sdk
+        ok &= bon
+        print(f"GLOBE GARANTI (bonus {k}) : {globes}/{n_sdk} FS SDK avec globe ; gain moyen par FS SDK "
+              f"{wins.mean():.2f} / feuille {notre.mean():.2f} (écart {diff / err:+.1f} σ) -> {'OK' if bon else 'ÉCART'}")
     return ok
 
 

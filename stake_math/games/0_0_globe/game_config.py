@@ -19,7 +19,7 @@ def _num(k):
 
 class GameConfig(Config):
     """Grille 5 x 5 (clusters + cascades, ou lignes / ways), globe qui transforme ses 8 voisins
-    en multiplicateurs, free spins avec +N FS par symbole bonus."""
+    en multiplicateurs, 3 bonus (3 / 4 / 5 symboles bonus, le 3e caché), spins boostés, bonus buy."""
 
     _instance = None
 
@@ -74,98 +74,102 @@ class GameConfig(Config):
             "globe": [self.globe_symbol],
         }
 
-        fs_k = p["fs_per_scatter_in_fs"]
+        # Les bonus : 1 = free spins, 2 = super free spins, 3 = bonus caché (voir params.json["bonuses"])
+        self.bonuses = {b["id"]: b for b in p["bonuses"]}
+        seuils = sorted((b["scatters"], b["id"]) for b in p["bonuses"])
         n_cases = self.num_reels * p["num_rows"]
-        seuils = sorted((int(k), int(v)) for k, v in p["fs_triggers_base"].items())
+        fs_k = p["fs_per_scatter_in_fs"]
         base_table = {}
         for n in range(seuils[0][0], n_cases + 1):   # le dernier seuil vaut « et plus » (cascades)
-            base_table[n] = [v for k, v in seuils if k <= n][-1]
+            base_table[n] = self.bonuses[[i for s, i in seuils if s <= n][-1]]["spins"]
         self.freespin_triggers = {
             self.basegame_type: base_table,
             # Pendant les FS : chaque symbole bonus ajoute fs_k free spins
             self.freegame_type: {n: n * fs_k for n in range(1, n_cases + 1)},
         }
         self.anticipation_triggers = {
-            self.basegame_type: min(self.freespin_triggers[self.basegame_type].keys()) - 1,
+            self.basegame_type: seuils[0][0] - 1,
             self.freegame_type: self.num_reels + 1,  # pas d'anticipation pendant les FS
         }
-        self.buy_cost = float(p["buy"]["cost"])
-        self.buy_spins = int(p["buy"]["spins"])
 
-        # Bandes de rouleaux
-        reels = {"BR0": "BR0.csv", "FR0": "FR0.csv", "WCAP": "FRWCAP.csv"}
+        # Bandes de rouleaux : BR0 (base), BRB (spins boostés), FR1/FR2/FR3 (FS de chaque bonus),
+        # WCAP (FS enrichis en globes, seulement pour fabriquer des résultats « max win »)
         self.reels = {}
-        for r, f in reels.items():
-            self.reels[r] = self.read_reels_csv(os.path.join(self.reels_path, f))
+        for r in ["BR0", "BRB", "WCAP"] + [b["reels"] for b in p["bonuses"]]:
+            self.reels[r] = self.read_reels_csv(os.path.join(self.reels_path, f"{'FRWCAP' if r == 'WCAP' else r}.csv"))
         # Bandes courtes pour l'animation des rouleaux côté front-end (config_fe uniquement)
         pad = {g: os.path.join(self.reels_path, f) for g, f in
                ((self.basegame_type, "PAD_BR.csv"), (self.freegame_type, "PAD_FR.csv"))}
         self.padding_reels[self.basegame_type] = (
             self.read_reels_csv(pad[self.basegame_type]) if os.path.exists(pad[self.basegame_type]) else self.reels["BR0"])
         self.padding_reels[self.freegame_type] = (
-            self.read_reels_csv(pad[self.freegame_type]) if os.path.exists(pad[self.freegame_type]) else self.reels["FR0"])
+            self.read_reels_csv(pad[self.freegame_type]) if os.path.exists(pad[self.freegame_type])
+            else self.reels[self.bonuses[1]["reels"]])
         self.padding_symbol_values = {self.globe_symbol: {"multiplier": {self.globe_multiplier: 1}}}
 
-        mult = {g: {_num(k): w for k, w in d.items()} for g, d in p["mult_values"].items()}
-        mult_normal = {self.basegame_type: mult["basegame"], self.freegame_type: mult["freegame"]}
-        mult_wincap = {self.basegame_type: mult["basegame"], self.freegame_type: mult["wincap"]}
-        scatter_natural = {int(k): w for k, w in p["scatter_trigger_weights"].items() if w > 0}
-        min_scatter = min(self.freespin_triggers[self.basegame_type].keys())
+        def multis(d):
+            return {_num(k): w for k, w in d.items()}
 
-        freegame_condition = {
-            "reel_weights": {self.basegame_type: {"BR0": 1}, self.freegame_type: {"FR0": 1}},
-            "scatter_triggers": scatter_natural,
-            "mult_values": mult_normal,
-            "force_wincap": False,
-            "force_freegame": True,
-        }
-        basegame_condition = {
-            "reel_weights": {self.basegame_type: {"BR0": 1}},
-            "mult_values": mult_normal,
-            "force_wincap": False,
-            "force_freegame": False,
-        }
-        zerowin_condition = dict(basegame_condition)
-        wincap_condition = {
-            "reel_weights": {self.basegame_type: {"BR0": 1}, self.freegame_type: {"FR0": 1, "WCAP": 5}},
-            "scatter_triggers": {k: w for k, w in scatter_natural.items() if k > min_scatter} or scatter_natural,
-            "mult_values": mult_wincap,
-            "force_wincap": True,
-            "force_freegame": True,
-        }
-        # Bonus buy : on force le nombre minimum de symboles bonus, le nombre de FS vient de buy.spins
-        buy_condition = dict(freegame_condition, scatter_triggers={min_scatter: 1})
-        buy_wincap_condition = dict(wincap_condition, scatter_triggers={min_scatter: 1})
+        mult_base = multis(p["mult_values"]["basegame"])
+        bonus_mults = {i: multis(b["mult_values"]) for i, b in self.bonuses.items()}
+        bonus_reels = {i: {b["reels"]: 1} for i, b in self.bonuses.items()}
+        # Max win : bandes enrichies en globes et multis plus forts, pour fabriquer ces résultats rares
+        wcap_mults = {i: {v: w * v for v, w in m.items()} for i, m in bonus_mults.items()}
+        wcap_reels = {i: {b["reels"]: 1, "WCAP": 5} for i, b in self.bonuses.items()}
 
-        self.bet_modes = [
-            BetMode(
-                name="base",
-                cost=1.0,
-                rtp=self.rtp,
-                max_win=self.wincap,
-                auto_close_disabled=False,
-                is_feature=True,
-                is_buybonus=False,
-                distributions=[
-                    Distribution(criteria="wincap", quota=0.001, win_criteria=self.wincap,
-                                 conditions=wincap_condition),
-                    Distribution(criteria="freegame", quota=0.1, conditions=freegame_condition),
-                    Distribution(criteria="0", quota=0.4, win_criteria=0.0, conditions=zerowin_condition),
-                    Distribution(criteria="basegame", quota=0.5, conditions=basegame_condition),
-                ],
-            ),
-            BetMode(
-                name="bonus",
-                cost=self.buy_cost,
-                rtp=self.rtp,
-                max_win=self.wincap,
-                auto_close_disabled=False,
-                is_feature=False,
-                is_buybonus=True,
-                distributions=[
-                    Distribution(criteria="wincap", quota=0.001, win_criteria=self.wincap,
-                                 conditions=buy_wincap_condition),
-                    Distribution(criteria="freegame", quota=0.1, conditions=buy_condition),
-                ],
-            ),
-        ]
+        def conditions(base_reels, scatters=None, wincap=False):
+            """scatters : {nb de symboles bonus forcés sur la grille de départ: poids} (None = pas de bonus).
+            Les bandes et les multis des FS dépendent du bonus obtenu (bonus_reels / bonus_mults, lus par
+            game_override.get_current_distribution_conditions)."""
+            c = {
+                "reel_weights": {self.basegame_type: {base_reels: 1},
+                                 self.freegame_type: (wcap_reels if wincap else bonus_reels)[1]},
+                "mult_values": {self.basegame_type: mult_base,
+                                self.freegame_type: (wcap_mults if wincap else bonus_mults)[1]},
+                "bonus_reels": wcap_reels if wincap else bonus_reels,
+                "bonus_mults": wcap_mults if wincap else bonus_mults,
+                "force_wincap": wincap,
+                "force_freegame": scatters is not None,
+            }
+            if scatters is not None:
+                c["scatter_triggers"] = scatters
+            return c
+
+        def jeu(nom, cout, base_reels, quotas):
+            """Mode de jeu « spin » (base ou boost). Critères : wincap, un critère par bonus (grille de
+            départ forcée avec le seuil du bonus ; le bonus obtenu dépend du nombre final de symboles
+            bonus, cascades comprises), 0 (perdu) et basegame (gagnant sans bonus)."""
+            dist = [Distribution(criteria="wincap", quota=0.001, win_criteria=self.wincap,
+                                 conditions=conditions(base_reels, {s: 1 for s, _ in seuils[1:]} or {seuils[0][0]: 1},
+                                                       wincap=True))]
+            for s, i in seuils:
+                dist.append(Distribution(criteria=f"bonus{i}", quota=quotas[i],
+                                         conditions=conditions(base_reels, {s: 1})))
+            dist += [
+                Distribution(criteria="0", quota=0.4, win_criteria=0.0, conditions=conditions(base_reels)),
+                Distribution(criteria="basegame", quota=round(0.599 - sum(quotas.values()), 4),
+                             conditions=conditions(base_reels)),
+            ]
+            return BetMode(name=nom, cost=cout, rtp=self.rtp, max_win=self.wincap, auto_close_disabled=False,
+                           is_feature=True, is_buybonus=False, distributions=dist)
+
+        def achat(nom, i):
+            """Bonus buy : le spin de déclenchement a exactement le seuil de symboles bonus du bonus i."""
+            s = self.bonuses[i]["scatters"]
+            return BetMode(name=nom, cost=float(self.bonuses[i]["buy_cost"]), rtp=self.rtp, max_win=self.wincap,
+                           auto_close_disabled=False, is_feature=False, is_buybonus=True,
+                           distributions=[
+                               Distribution(criteria="wincap", quota=0.001, win_criteria=self.wincap,
+                                            conditions=conditions("BR0", {s: 1}, wincap=True)),
+                               Distribution(criteria="freegame", quota=0.999, conditions=conditions("BR0", {s: 1})),
+                           ])
+
+        quotas = {1: 0.08, 2: 0.06, 3: 0.04}
+        self.bet_modes = [jeu("base", 1.0, "BR0", quotas),
+                          jeu("boost", float(p["boost"]["cost"]), "BRB", quotas)]
+        # Modes d'achat : nom du mode -> bonus acheté
+        self.buy_modes = {}
+        for i, b in sorted(self.bonuses.items()):
+            if b.get("buy_cost"):
+                self.buy_modes[b["mode"]] = i
+                self.bet_modes.append(achat(b["mode"], i))

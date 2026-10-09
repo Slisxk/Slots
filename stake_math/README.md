@@ -1,4 +1,4 @@
-# Maths Stake Engine : grille 5x5, clusters + cascades, globe à multiplicateurs, free spins
+# Maths Stake Engine : grille 5x5, clusters + cascades, globe à multiplicateurs, 3 bonus
 
 Ce dossier transforme la feuille de calcul (`../modele_maths/modele_maths.xlsx`) en jeu pour le **math SDK officiel de Stake Engine** ([StakeEngine/math-sdk](https://github.com/StakeEngine/math-sdk)). Le SDK produit les fichiers à déposer sur Stake Engine : books, lookup tables et `index.json`.
 
@@ -9,8 +9,9 @@ Le principe :
 - gains en **clusters** : au moins 5 symboles identiques reliés, et les wilds relient ;
 - **cascades** ;
 - le **globe** transforme ses 8 voisins en wilds multiplicateurs, et le multi d'un cluster est la somme de ses multis ;
-- **free spins** : +1 FS par symbole bonus ;
-- **bonus buy**.
+- **3 bonus** : 3 symboles bonus = bonus 1, 4 = bonus 2, 5 = bonus 3 (caché, globe garanti à chaque FS) ; +1 FS par symbole bonus pendant les FS ;
+- **spins boostés** (mode `boost`) : plus de symboles bonus pour un spin plus cher ;
+- **bonus buy** : bonus 1 (mode `bonus`) et bonus 2 (mode `super`).
 
 ```
 stake_math/
@@ -18,15 +19,16 @@ stake_math/
 ├── verifier_sdk.py        compare le simulateur de la feuille au SDK (gains exacts + cascades)
 ├── sortie/                config front-end + statistiques de la dernière génération SDK
 └── games/0_0_globe/       le jeu, au format d'un dossier games/ du math SDK
-    ├── params.json        (généré) paytable, lignes, multis, FS, bonus buy, cibles RTP
-    ├── reels/*.csv        (généré) bandes BR0 (base), FR0 (FS), FRWCAP (max win), PAD_* (animation)
+    ├── params.json        (généré) paytable, lignes, multis, les 3 bonus, boost, prix, cibles de pondération
+    ├── reels/*.csv        (généré) bandes BR0 (base), BRB (boost), FR1/FR2/FR3 (FS de chaque bonus),
+    │                      FRWCAP (max win), PAD_* (animation)
     ├── game_config.py     modes de mise, distributions, symboles spéciaux
     ├── gamestate.py       déroulé d'un tour (base + free spins)
     ├── game_executables.py  transformation autour du globe + calcul des gains
     ├── game_events.py     événement « globeMultipliers » pour le front-end
+    ├── game_override.py   choix du bonus, bandes et multis de chaque bonus, globe garanti
     ├── ponderation.py     poids des résultats : distribution naturelle, RTP exact, limites « 3 étoiles »
-    ├── game_optimization.py cibles de l'optimiseur Rust (option --optimiseur)
-    └── run.py             simulation, optimisation, stats et vérifications
+    └── run.py             simulation, pondération, stats et vérifications
 ```
 
 ## Étapes
@@ -37,7 +39,7 @@ stake_math/
    python exporter.py ../modele_maths/modele_maths.xlsx --game-id 0_0_globe --nom "Mon Jeu" --studio mon_studio
    ```
    Avec un autre `--game-id`, les fichiers Python sont recopiés dans `games/<game-id>/`.
-3. **Installer le math SDK** (Python 3.12+ ; Rust/Cargo seulement pour l'option `--optimiseur`), à la racine de ce repo, à côté de `stake_math/` :
+3. **Installer le math SDK** (Python 3.12+), à la racine de ce repo, à côté de `stake_math/` :
    ```bash
    git clone https://github.com/StakeEngine/math-sdk.git && cd math-sdk && make setup
    env/bin/pip install openpyxl   # pour verifier_sdk.py
@@ -47,10 +49,10 @@ stake_math/
    cp -r ../stake_math/games/0_0_globe games/
    env/bin/python ../stake_math/verifier_sdk.py . ../modele_maths/modele_maths.xlsx   # feuille = SDK ?
    env/bin/python games/0_0_globe/run.py --test   # essai rapide (2 000 books/mode)
-   env/bin/python games/0_0_globe/run.py          # complet : books + optimisation + stats + checks
+   env/bin/python games/0_0_globe/run.py          # complet : books + pondération + stats + checks
    ```
 5. **Récupérer les fichiers à publier** dans `games/0_0_globe/library/publish_files/` :
-   - `books_*.jsonl.zst` ;
+   - `books_*.jsonl.zst` (un par mode : `base`, `boost`, `bonus`, `super`) ;
    - `lookUpTable_*_0.csv` ;
    - `index.json`.
 
@@ -67,6 +69,8 @@ En plus des événements standard du SDK (`reveal`, `winInfo`, `tumbleBoard`, `u
 ```
 
 Les lignes sont décalées de +1, à cause des symboles de padding, comme dans les autres événements du SDK. En mode `GLOBAL_SUM`, l'événement porte aussi `boardMultiplier`.
+
+L'événement `freeSpinTrigger` porte en plus `"bonus": 1`, `2` ou `3` : le front-end affiche l'intro du bonus correspondant (le 3 est le bonus caché).
 
 ## Modes possibles
 
@@ -87,9 +91,10 @@ Les combinaisons gérées nativement par le SDK, à choisir dans la feuille :
   - Les poids deviennent des nombres d'occurrences sur la bande.
   - Les symboles bonus sont espacés pour qu'il y en ait au plus 1 par rouleau visible. Le bonus naturel est donc un peu plus rare que dans la feuille, et l'exportateur affiche sa vraie fréquence.
 - **Cascades** : dans le SDK, les nouveaux symboles viennent de la bande, au-dessus de la grille. Dans la feuille, ils sont tirés case par case avec les mêmes poids. `verifier_sdk.py` vérifie que les deux donnent statistiquement le même gain moyen et le même taux de spins gagnants.
+- **Critères** des modes `base` et `boost` : le SDK force la grille de départ à 3, 4 ou 5 symboles bonus (critères `bonus1`, `bonus2`, `bonus3`) ; les cascades peuvent ensuite faire monter le bonus obtenu.
 - **RTP final** : `ponderation.py` pondère les books en gardant la distribution naturelle du jeu.
-  - Chaque catégorie de résultats garde sa probabilité réelle : fréquence du bonus mesurée par la feuille, max win à 0,1 % du RTP.
+  - Chaque tour bonus (critère SDK × bonus obtenu) garde sa probabilité réelle, mesurée par la feuille ; le max win reçoit 0,1 % du RTP.
   - Le RTP est ajusté exactement à la cible.
-  - Les gros gains (≥ 40× le coût du mode) ne sont réduits que si la limite « 3 étoiles » `etl40b` du SDK l'exige.
+  - Les gros gains (≥ 40× le coût du mode, ou ≥ 10 000×) ne sont rendus plus rares que si les limites « 3 étoiles » `etl40b` / `etl10k` du SDK l'exigent.
 
-  L'optimiseur Rust du SDK reste disponible (`run.py --optimiseur`), mais avec les réglages de l'exemple officiel il déformait fortement la distribution des gains. Une feuille calée près de 96 % garde les ajustements minimes.
+  L'optimiseur Rust du SDK n'est plus utilisé : avec les réglages de l'exemple officiel, il déformait fortement la distribution des gains.

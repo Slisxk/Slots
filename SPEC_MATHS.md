@@ -1,10 +1,10 @@
-# Spécification maths : slot 5×5 « clusters + globe multiplicateur »
+# Spécification maths : slot 5×5 « clusters + globe multiplicateur + 3 bonus »
 
 > **À lire en premier (pour la conversation qui construit le jeu)**
 > - Ce document décrit des **maths finies et validées** pour une slot publiée sur **Stake Engine**.
 > - Le front-end ne calcule rien : il **rejoue les résultats** (« books ») que le serveur de Stake lui envoie.
 > - La direction artistique est **entièrement libre**. Les symboles n'ont que des codes (`H1`, `L3`, `GL`…) ; à toi de leur donner un thème, des visuels, des animations et des sons.
-> - **Ne change pas** les règles, la paytable, les multiplicateurs ni le nombre de free spins décrits ici : ils sont figés dans les fichiers de maths.
+> - **Ne change pas** les règles, la paytable, les multiplicateurs, les bonus, les prix ni le nombre de free spins décrits ici : ils sont figés dans les fichiers de maths.
 > - Le front-end se construit avec le web SDK officiel : [StakeEngine/web-sdk](https://github.com/StakeEngine/web-sdk) (Svelte 5 + PixiJS 8).
 
 ---
@@ -40,7 +40,7 @@
 | `L1` | Bas 1 | faible | symboles simples, très lisibles (ils tombent souvent) |
 | `L2` | Bas 2 | faible | |
 | `L3` | Bas 3 | le plus faible | |
-| `BN` | **Bonus (scatter)** | ne paie pas | déclenche les free spins, doit se voir de loin |
+| `BN` | **Bonus (scatter)** | ne paie pas | déclenche les bonus (3, 4 ou 5 = bonus 1, 2 ou 3), doit se voir de loin |
 | `GL` | **Globe (spécial)** | ne paie pas seul | wild ×1 ; déclenche la transformation de ses voisins |
 | `W` | **Wild multiplicateur** | ne paie pas seul | n'existe pas sur les rouleaux : créé par le globe, porte une valeur (×1 à ×50) |
 
@@ -55,10 +55,15 @@ Les symboles bonus `BN`, les globes `GL` et les wilds `W` déjà posés ne sont 
 3. **Multiplicateur d'un cluster** : c'est la somme des multiplicateurs des wilds du cluster (globe = ×1). Sans wild, il vaut ×1. Par exemple, un cluster qui contient un `W` ×5, un `W` ×3 et le globe est multiplié par 9.
 4. **Cascades** : après chaque gain, les cases gagnantes (wilds compris) disparaissent. Les symboles au-dessus tombent et de nouveaux symboles arrivent par le haut. On réévalue les gains et on recommence jusqu'à ce qu'il n'y en ait plus.
 5. **Globe** : chaque fois qu'un globe arrive sur la grille (au départ ou pendant une cascade), ses 8 cases voisines deviennent des wilds multiplicateurs `W` avec une valeur tirée au hasard (section 5). Les symboles bonus et les globes ne sont pas transformés.
-6. **Free spins** : 3, 4, ou 5 symboles bonus et plus sur la grille, après les cascades, donnent 10, 12 ou 15 free spins. Pendant les free spins, chaque symbole bonus présent à la fin d'un spin ajoute 1 free spin. Les globes y sont plus fréquents et leurs multiplicateurs plus forts.
-7. **Bonus buy** : pour 59 × la mise, on obtient directement 10 free spins. Le tour commence par un spin de déclenchement avec 3 symboles bonus, qui peut lui-même gagner (cascades et globes compris).
-8. **Max win** : le gain d'un tour (spin + free spins) est plafonné à 10 000 × la mise. Quand le plafond est atteint, le tour s'arrête immédiatement.
-9. Les gains sont exprimés en multiples de la mise totale. Les mauvais fonctionnements annulent tous les gains et jeux.
+6. **Les 3 bonus** : le nombre de symboles bonus sur la grille, après les cascades, choisit le bonus :
+   - **3 symboles bonus → Bonus 1 « Free spins »** : 10 free spins. Les globes sont plus fréquents qu'en jeu de base et leurs multiplicateurs plus forts.
+   - **4 symboles bonus → Bonus 2 « Super free spins »** : 12 free spins, encore plus de globes et des multiplicateurs plus forts (jusqu'à ×100).
+   - **5 symboles bonus ou plus → Bonus 3, le bonus caché** : 5 free spins, avec **un globe garanti sur chaque free spin** (s'il n'y en a pas au départ, une case au hasard devient un globe avant que la grille s'affiche). Ses multiplicateurs sont plus petits (×1 à ×5), mais un globe à chaque spin fait de gros gains.
+   - Pendant les free spins des 3 bonus, chaque symbole bonus présent à la fin d'un spin ajoute 1 free spin (le bonus ne change pas).
+7. **Spins boostés** : pour 1,5 × la mise par spin, les rouleaux ont plus de symboles bonus : les bonus arrivent environ 2,3 fois plus souvent. Tout le reste est identique au jeu de base.
+8. **Bonus buy** : Bonus 1 pour 61 × la mise, Bonus 2 pour 160 × la mise. Le tour commence par un spin de déclenchement avec 3 (ou 4) symboles bonus, qui peut lui-même gagner (cascades et globes compris). Le bonus caché ne s'achète pas.
+9. **Max win** : le gain d'un tour (spin + free spins) est plafonné à 10 000 × la mise. Quand le plafond est atteint, le tour s'arrête immédiatement.
+10. Les gains sont exprimés en multiples de la mise totale. Les mauvais fonctionnements annulent tous les gains et jeux.
 
 ---
 
@@ -80,21 +85,25 @@ Gain d'un cluster = valeur ci-dessus × multiplicateur du cluster.
 
 ## 5. Multiplicateurs posés par le globe (`W`)
 
-| Valeur | ×1 | ×2 | ×3 | ×4 | ×5 | ×10 | ×20 | ×50 |
-|---|---|---|---|---|---|---|---|---|
-| Probabilité, jeu de base | 30 % | 40 % | 20 % | 6 % | 3 % | 0,8 % | 0,2 % | — |
-| Probabilité, free spins | 15,2 % | 30,5 % | 25,4 % | 12,2 % | 9,1 % | 5,1 % | 2,0 % | 0,5 % |
-
-Le multiplicateur moyen vaut ×2,2 en jeu de base et ×3,6 en free spins.
+| Valeur | ×1 | ×2 | ×3 | ×4 | ×5 | ×10 | ×20 | ×50 | ×100 | Moyenne |
+|---|---|---|---|---|---|---|---|---|---|---|
+| Jeu de base et spins boostés | 30 % | 40 % | 20 % | 6 % | 3 % | 0,8 % | 0,2 % | — | — | ×2,2 |
+| Bonus 1 | 15,2 % | 30,5 % | 25,4 % | 12,2 % | 9,1 % | 5,1 % | 2,0 % | 0,5 % | — | ×3,6 |
+| Bonus 2 | 6,5 % | 21,6 % | 27,0 % | 17,3 % | 14,0 % | 8,6 % | 3,8 % | 1,1 % | 0,2 % | ×5,1 |
+| Bonus 3 (caché) | 50 % | 35 % | 12 % | 2,5 % | 0,5 % | — | — | — | — | ×1,7 |
 
 ---
 
 ## 6. Modes de mise
 
-| Mode | Coût | Contenu |
-|---|---|---|
-| `base` | 1 × la mise | spin normal (peut déclencher les free spins) |
-| `bonus` | 59 × la mise | bonus buy : 10 free spins directement |
+| Mode | Coût | Type | Contenu |
+|---|---|---|---|
+| `base` | 1 × la mise | spin | spin normal (peut déclencher les 3 bonus) |
+| `boost` | 1,5 × la mise | spin (option activable, comme une « ante bet ») | spins boostés : bonus environ 2,3 fois plus fréquents |
+| `bonus` | 61 × la mise | achat | Bonus 1 « Free spins » directement |
+| `super` | 160 × la mise | achat | Bonus 2 « Super free spins » directement |
+
+Le bonus caché ne s'achète pas : il ne se déclenche qu'avec 5 symboles bonus, en mode `base` ou `boost`. Côté interface, `boost` est un interrupteur qui reste activé d'un spin à l'autre ; `bonus` et `super` sont deux boutons d'achat.
 
 ---
 
@@ -123,7 +132,7 @@ Chaque tour est un objet JSON (un « book ») envoyé par le serveur RGS de Stak
 | `tumbleBoard` | après un gain | fait exploser `explodingSymbols` (une case peut y apparaître plusieurs fois si elle était dans plusieurs clusters : dédoublonner) et tomber les symboles, puis fait arriver `newSymbols` par le haut. `newSymbols[reel]` liste les nouveaux symboles de haut en bas, le premier est le nouveau padding du haut |
 | `setWin` | fin des cascades d'un spin gagnant | affiche le gain du spin (`winLevel` de 1 à 10, pour choisir l'animation de célébration) |
 | `setTotalWin` | fin de chaque spin | met à jour le gain total du tour |
-| `freeSpinTrigger` | déclenchement des FS | anime les symboles bonus (`positions`), annonce `totalFs` |
+| `freeSpinTrigger` | déclenchement des FS | anime les symboles bonus (`positions`), annonce `totalFs` ; **`bonus`** (1, 2 ou 3) dit quel bonus démarre : intro, musique et décor propres à chaque bonus, révélation spéciale pour le 3 (caché) |
 | `updateFreeSpin` | début de chaque FS | compteur de FS : `amount` = nombre de FS déjà joués (0 au premier), `total` = nombre total |
 | `freeSpinRetrigger` | un symbole bonus pendant les FS | +1 FS par symbole bonus, `totalFs` mis à jour |
 | `freeSpinEnd` | fin des FS | écran récapitulatif (`amount`, `winLevel`) |
@@ -144,6 +153,15 @@ Chaque tour est un objet JSON (un « book ») envoyé par le serveur RGS de Stak
 ```
 
 Le `board` des événements suivants contient déjà les `W` avec leur multiplicateur.
+
+**Champ ajouté à `freeSpinTrigger` : `bonus`**
+
+```json
+{"type": "freeSpinTrigger", "totalFs": 5, "bonus": 3,
+ "positions": [{"reel": 0, "row": 2}, {"reel": 1, "row": 4}, {"reel": 2, "row": 1}, {"reel": 3, "row": 5}, {"reel": 4, "row": 3}]}
+```
+
+Dans le bonus caché, le `board` de chaque `reveal` des free spins contient toujours au moins un `GL` : le front-end n'a rien à calculer, il peut seulement mettre en scène le globe garanti.
 
 *(Des exemples réels de tours complets sont en section 9.)*
 

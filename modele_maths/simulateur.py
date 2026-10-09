@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 """
-Simulateur Monte Carlo pour le modèle de maths (grille 5 rouleaux,
-gains en lignes ou en ways, globe qui fait apparaître des multiplicateurs autour de lui,
-free spins avec +1 FS par symbole bonus).
+Simulateur Monte Carlo pour le modèle de maths (grille 5 rouleaux, clusters + cascades,
+ou lignes / ways ; globe qui fait apparaître des multiplicateurs autour de lui ;
+3 bonus déclenchés par 3 / 4 / 5 symboles bonus, dont un bonus caché ; spins boostés).
 
 Il lit tous les paramètres dans le classeur Excel (plages nommées) et réécrit
 les résultats dans l'onglet « Simulation ».
 
     python simulateur.py modele_maths.xlsx
-    python simulateur.py modele_maths.xlsx --spins 500000 --buy 20000
+    python simulateur.py modele_maths.xlsx --spins 500000 --boost 200000 --buy 20000
     python simulateur.py modele_maths.xlsx --no-write   # affiche seulement
 """
 import argparse
@@ -45,6 +45,10 @@ def _name_value(wb, name):
     return _name_range(wb, name)[0][0]
 
 
+def _oui(v):
+    return str(v).strip().upper() in ("OUI", "YES", "TRUE", "1")
+
+
 def load_params(path):
     wb = load_workbook(path)  # pas data_only : les entrées sont des constantes
     pay_rows = [r for r in _name_range(wb, "PAYTABLE") if r[0] not in (None, "")]
@@ -59,11 +63,25 @@ def load_params(path):
         return w
 
     multis = [r for r in _name_range(wb, "MULTIS") if r[0] not in (None, "")]
-    table_fs = [r for r in _name_range(wb, "TABLE_FS") if r[0] not in (None, "")]
+    bonus = []
+    for r in _name_range(wb, "BONUS"):
+        if r[0] in (None, "") or r[1] in (None, ""):
+            continue
+        bonus.append({"nom": str(r[0]), "bn": int(r[1]), "fs": int(r[2]), "globe_garanti": _oui(r[3]),
+                      "prix": float(r[4]) if r[4] not in (None, "", 0) else None})
     lignes = [[int(v) - 1 for v in r] for r in _name_range(wb, "LIGNES")
               if all(v not in (None, "") for v in r)]
     tailles = [int(v) for v in _name_range(wb, "TAILLES_CLUSTER")[0] if v not in (None, "")]
     pay_cl = [[float(v or 0) for v in r[:len(tailles)]] for r in _name_range(wb, "PAYTABLE_CLUSTER")[:n_sym]]
+
+    # Une « phase » = un jeu de poids de rouleaux + une table de multis :
+    # base, boost (spins boostés), fs1 / fs2 / fs3 (free spins de chaque bonus)
+    poids = {"base": weights("POIDS_BASE"), "boost": weights("POIDS_BOOST")}
+    multi_w = {"base": np.array([float(r[1] or 0) for r in multis])}
+    multi_w["boost"] = multi_w["base"]
+    for k in range(len(bonus)):
+        poids[f"fs{k + 1}"] = weights(f"POIDS_FS{k + 1}")
+        multi_w[f"fs{k + 1}"] = np.array([float(r[2 + k] or 0) for r in multis])
 
     p = {
         "codes": [r[0] for r in pay_rows],
@@ -72,13 +90,11 @@ def load_params(path):
         "pays": np.array([[float(v or 0) for v in r[3:6]] for r in pay_rows]),  # 3,4,5 OAK
         "tailles": tailles,                               # taille mini de chaque groupe de la paytable cluster
         "pays_cluster": np.array(pay_cl).reshape(n_sym, len(tailles)),
-        "cascades": str(_name_value(wb, "CASCADES")).strip().upper() in ("OUI", "YES", "TRUE", "1"),
-        "poids_base": weights("POIDS_BASE"),
-        "poids_fs": weights("POIDS_FS"),
+        "cascades": _oui(_name_value(wb, "CASCADES")),
+        "poids": poids,
         "multi_val": np.array([float(r[0]) for r in multis]),
-        "multi_w_base": np.array([float(r[1] or 0) for r in multis]),
-        "multi_w_fs": np.array([float(r[2] or 0) for r in multis]),
-        "table_fs": sorted((int(r[0]), int(r[1])) for r in table_fs),
+        "multi_w": multi_w,
+        "bonus": bonus,
         "lignes": np.array(lignes, dtype=np.int64).reshape(-1, 5),
         "rows": int(_name_value(wb, "NB_LIGNES")),
         "mode_gain": str(_name_value(wb, "MODE_GAIN")).strip().upper(),
@@ -86,14 +102,14 @@ def load_params(path):
         "max_win": float(_name_value(wb, "MAX_WIN")),
         "mode": str(_name_value(wb, "MODE_MULTI")).strip().upper(),
         "multi_globe": float(_name_value(wb, "MULTI_GLOBE")),
-        "scatter_min": int(_name_value(wb, "SCATTER_MIN")),
         "fs_par_bonus": float(_name_value(wb, "FS_PAR_BONUS")),
-        "buy_cout": float(_name_value(wb, "BUY_COUT")),
-        "buy_fs": int(_name_value(wb, "BUY_FS")),
+        "boost_cout": float(_name_value(wb, "BOOST_COUT")),
         "sim_spins": int(_name_value(wb, "SIM_SPINS")),
+        "sim_boost": int(_name_value(wb, "SIM_BOOST")),
         "sim_buy": int(_name_value(wb, "SIM_BUY")),
         "seed": int(_name_value(wb, "SIM_SEED")),
     }
+    p["scatter_min"] = bonus[0]["bn"] if bonus else 0
     validate(p)
     return p
 
@@ -119,11 +135,23 @@ def validate(p):
         sys.exit("La Paytable doit contenir au plus un symbole de type GLOBE.")
     if "PAY" not in p["types"]:
         sys.exit("La Paytable doit contenir au moins un symbole de type PAY.")
-    for w in (p["poids_base"], p["poids_fs"]):
+    b = p["bonus"]
+    if not 1 <= len(b) <= 3:
+        sys.exit("Config : il faut entre 1 et 3 bonus dans la table des bonus.")
+    seuils = [x["bn"] for x in b]
+    if seuils != sorted(set(seuils)) or seuils[0] < 1 or seuils[-1] > 5:
+        sys.exit("Table des bonus : les nombres de symboles bonus doivent être croissants, entre 1 et 5 "
+                 "(au plus 1 symbole bonus par rouleau sur la grille de départ).")
+    if any(x["fs"] < 1 for x in b):
+        sys.exit("Table des bonus : chaque bonus doit donner au moins 1 FS.")
+    if p["boost_cout"] <= 1:
+        sys.exit("BOOST_COUT : le prix des spins boostés doit être > 1 x la mise.")
+    for nom, w in p["poids"].items():
         if (w.sum(axis=0) <= 0).any():
-            sys.exit("Chaque rouleau doit avoir un poids total > 0.")
-    if p["multi_w_base"].sum() <= 0 or p["multi_w_fs"].sum() <= 0:
-        sys.exit("Les poids des multiplicateurs doivent avoir une somme > 0.")
+            sys.exit(f"Poids ({nom}) : chaque rouleau doit avoir un poids total > 0.")
+    for nom, w in p["multi_w"].items():
+        if w.sum() <= 0:
+            sys.exit(f"Multis ({nom}) : les poids des multiplicateurs doivent avoir une somme > 0.")
 
 
 # --------------------------------------------------------------------------- #
@@ -140,10 +168,7 @@ class Moteur:
         self.top = self.pay_idx[0]           # les ways 100 % wild paient comme ce symbole
         self.sc = types.index("SCATTER")
         self.gl = types.index("GLOBE") if "GLOBE" in types else -1
-        self.prob = {
-            "base": p["poids_base"] / p["poids_base"].sum(axis=0),
-            "fs": p["poids_fs"] / p["poids_fs"].sum(axis=0),
-        }
+        self.prob = {k: w / w.sum(axis=0) for k, w in p["poids"].items()}
         # Au plus 1 symbole bonus par rouleau (comme sur les bandes du SDK, où les symboles bonus sont espacés) :
         # le symbole bonus est présent sur le rouleau avec la probabilité lignes x p, à une rangée au hasard ;
         # les autres cases sont tirées parmi les symboles hors symbole bonus. Chaque case garde sa
@@ -165,34 +190,51 @@ class Moteur:
         for j, t in enumerate(p["tailles"]):
             fin = p["tailles"][j + 1] if j + 1 < len(p["tailles"]) else n_cases + 1
             self.pay_taille[:, min(t, n_cases + 1):min(fin, n_cases + 1)] = p["pays_cluster"][:, j][:, None]
-        self.mprob = {
-            "base": p["multi_w_base"] / p["multi_w_base"].sum(),
-            "fs": p["multi_w_fs"] / p["multi_w_fs"].sum(),
-        }
+        self.mprob = {k: w / w.sum() for k, w in p["multi_w"].items()}
+        # Bonus dont chaque free spin commence avec au moins 1 globe
+        self.garanti = {f"fs{k + 1}": b["globe_garanti"] for k, b in enumerate(p["bonus"])}
 
-    def _tirage(self, n, phase):
-        """Grille (n, lignes, rouleaux) d'indices de symboles, au plus 1 symbole bonus par rouleau."""
+    def _tirage(self, n, phase, force_bn=None):
+        """Grille (n, lignes, rouleaux) d'indices de symboles, au plus 1 symbole bonus par rouleau.
+        force_bn : nombre exact de symboles bonus sur la grille (comme force_special_board du SDK :
+        rouleaux choisis l'un après l'autre, en proportion de leur probabilité d'avoir un symbole bonus)."""
         u = self.rng.random((n, self.rows, self.reels))
         cum = self.cum[phase]
         grid = np.empty(u.shape, dtype=np.int16)
         for r in range(self.reels):
             grid[:, :, r] = np.searchsorted(cum[:, r], u[:, :, r], side="right")
         grid = np.minimum(grid, len(self.p["codes"]) - 1)
-        a_sc = self.rng.random((n, self.reels)) < self.q_sc[phase]
+        if force_bn is None:
+            a_sc = self.rng.random((n, self.reels)) < self.q_sc[phase]
+        else:
+            # tirage pondéré sans remise (clés d'Efraimidis-Spirakis) des rouleaux qui ont un symbole bonus
+            cle = np.log(self.rng.random((n, self.reels))) / np.maximum(self.q_sc[phase], 1e-300)
+            rang = np.argsort(np.argsort(-cle, axis=1), axis=1)
+            a_sc = rang < force_bn
         rangee = self.rng.integers(0, self.rows, size=(n, self.reels))
         i, r = np.nonzero(a_sc)
         grid[i, rangee[i, r], r] = self.sc
+        if self.garanti.get(phase) and self.gl >= 0:
+            # Globe garanti (comme game_override.ensure_globe du SDK) : sans globe sur la grille de
+            # départ, une case au hasard (hors symbole bonus) devient un globe.
+            sans = np.flatnonzero(~(grid == self.gl).any(axis=(1, 2)))
+            if sans.size:
+                score = self.rng.random((sans.size, self.rows, self.reels))
+                score[grid[sans] == self.sc] = -1.0
+                case = score.reshape(sans.size, -1).argmax(axis=1)
+                grid[sans, case // self.reels, case % self.reels] = self.gl
         return grid
 
-    def spin(self, n, phase):
-        """Joue n spins. Renvoie (gain x mise, nb symboles bonus, a_un_globe, gains par symbole)."""
+    def spin(self, n, phase, force_bn=None):
+        """Joue n spins. Renvoie (gain x mise, nb symboles bonus à la fin, a_un_globe,
+        gains par symbole, nb symboles bonus sur la grille de départ)."""
         if self.p["mode_gain"] == "CLUSTER":
-            return self._spin_cluster(n, phase)
-        grid = self._tirage(n, phase)
+            return self._spin_cluster(n, phase, force_bn)
+        grid = self._tirage(n, phase, force_bn)
         n_bonus = (grid == self.sc).sum(axis=(1, 2))
         globe, voisin, mult = self.transformer(grid, phase)
         g = self.evaluer(grid, globe | voisin, mult)        # (n, nb symboles)
-        return g.sum(axis=1), n_bonus, (globe | voisin).any(axis=(1, 2)), g.sum(axis=0)
+        return g.sum(axis=1), n_bonus, (globe | voisin).any(axis=(1, 2)), g.sum(axis=0), n_bonus
 
     def transformer(self, grid, phase):
         """Les 8 cases autour de chaque globe deviennent des multiplicateurs
@@ -328,13 +370,14 @@ class Moteur:
         return out
 
     # ----------------------------------------------------------------- clusters + cascades
-    def _spin_cluster(self, n, phase):
+    def _spin_cluster(self, n, phase, force_bn=None):
         """Mode CLUSTER, mêmes règles que le math SDK (src/calculations/cluster.py + tumble.py) :
         groupes de symboles identiques reliés horizontalement/verticalement, les wilds relient ;
         multi d'un cluster = somme des multis qu'il contient (1 si aucun) ; les cases gagnantes
         explosent et de nouveaux symboles tombent (cascades) jusqu'à ce qu'il n'y ait plus de gain.
         Les globes qui arrivent sur la grille (au départ ou en cascade) transforment leurs voisins."""
-        G = self._tirage(n, phase).astype(np.int16)
+        G = self._tirage(n, phase, force_bn).astype(np.int16)
+        n_depart = (G == self.sc).sum(axis=(1, 2))
         Mu = np.zeros(G.shape)
         nouveau = np.ones(G.shape, dtype=bool)
         par_sym = np.zeros((n, len(self.p["codes"])))
@@ -354,7 +397,7 @@ class Moteur:
             grid, mult, nv = self._tomber(grid[suite], mult[suite], explose[suite], phase)
             G[idx], Mu[idx], nouveau[idx] = grid, mult, nv
         n_bonus = (G == self.sc).sum(axis=(1, 2))
-        return par_sym.sum(axis=1), n_bonus, a_globe, par_sym.sum(axis=0)
+        return par_sym.sum(axis=1), n_bonus, a_globe, par_sym.sum(axis=0), n_depart
 
     def _activer_globes(self, grid, mult, nouveau, phase):
         """Les globes qui viennent d'arriver transforment leurs 8 voisins en multiplicateurs
@@ -439,23 +482,41 @@ class Moteur:
         mult = np.where(nouveau, 0.0, mult)
         return grid, mult, nouveau
 
-    def fs_initiaux(self, nb_bonus):
-        table = self.p["table_fs"]
+    def loi_depart(self, phase):
+        """Loi exacte du nombre de symboles bonus sur la grille de départ (0..5)."""
+        dist = np.array([1.0])
+        for q in self.q_sc[phase]:
+            dist = np.convolve(dist, [1 - q, q])
+        return dist
+
+    def type_bonus(self, nb_bonus):
+        """Bonus déclenché (0 = aucun, 1..3) selon le nombre de symboles bonus sur la grille finale :
+        le bonus le plus fort dont le seuil est atteint."""
         out = np.zeros(len(nb_bonus), dtype=np.int64)
-        for seuil, fs in table:                 # table triée : le dernier seuil couvre « et plus »
-            out[nb_bonus >= seuil] = fs
+        for k, b in enumerate(self.p["bonus"]):
+            out[nb_bonus >= b["bn"]] = k + 1
         return out
 
-    def sessions_fs(self, fs_init, plafond):
-        """Joue des sessions de free spins. Renvoie (gain total, nb de FS joués, gains par symbole)."""
+    def critere(self, nb_depart):
+        """Critère SDK d'un tour qui déclenche un bonus : le SDK force la grille de départ à avoir
+        exactement le seuil d'un bonus (critères bonus1 / bonus2 / bonus3). Un départ sous le premier
+        seuil (bonus amené par une cascade) est rattaché à bonus1."""
+        out = np.ones(len(nb_depart), dtype=np.int64)
+        for k, b in enumerate(self.p["bonus"]):
+            out[nb_depart >= b["bn"]] = k + 1
+        return out
+
+    def sessions_fs(self, fs_init, plafond, phase):
+        """Joue des sessions de free spins (phase fs1 / fs2 / fs3).
+        Renvoie (gain total, nb de FS joués, gains par symbole)."""
         n = len(fs_init)
         total = np.zeros(n)
-        restant = fs_init.astype(float).copy()
+        restant = np.asarray(fs_init, dtype=float).copy()
         joues = np.zeros(n, dtype=np.int64)
         par_symbole = np.zeros(len(self.p["codes"]))
         actifs = np.flatnonzero(restant > 0)
         while actifs.size:
-            g, tr, _, ps = self.spin(actifs.size, "fs")
+            g, tr, _, ps, _ = self.spin(actifs.size, phase)
             total[actifs] += g
             par_symbole += ps
             joues[actifs] += 1
@@ -469,150 +530,314 @@ class Moteur:
 # --------------------------------------------------------------------------- #
 # Simulation complète
 # --------------------------------------------------------------------------- #
-def simuler(p, spins=None, buy=None, lot=100_000, verbose=True):
-    rng = np.random.default_rng(p["seed"])
-    m = Moteur(p, rng)
-    spins = spins or p["sim_spins"]
-    buy = p["sim_buy"] if buy is None else buy
-    cap = p["max_win"]
+# Disposition de l'onglet « Simulation » (partagée avec la génération du classeur et l'exporteur)
+NUM, PCT, X2 = "#,##0", "0.00%", '0.00"x"'
+LIGNES_MODE = [   # colonnes B = jeu de base, C = spins boostés
+    ("date", "Date de la simulation", None),
+    ("spins", "Spins simulés", NUM),
+    ("cout", "Coût d'un spin (x mise)", "0.00"),
+    ("rtp_base", "RTP des spins (hors bonus)", PCT),
+    ("rtp_fs", "RTP des bonus", PCT),
+    ("rtp_total", "RTP total", PCT),
+    ("marge", "Marge d'erreur RTP (± à 95 %)", "0.000%"),
+    ("hit", "Hit frequency", PCT),
+    ("ecart_type", "Écart-type par tour (x mise)", "0.00"),
+    ("trig", "Bonus (tous) : 1 spin sur", NUM),
+    *[(f"trig{k}", f"Bonus {k} : 1 spin sur", NUM) for k in (1, 2, 3)],
+    *[(f"gain{k}", f"Bonus {k} : gain moyen (x mise)", X2) for k in (1, 2, 3)],
+    *[(f"fsm{k}", f"Bonus {k} : FS joués en moyenne", "0.00") for k in (1, 2, 3)],
+    ("max", "Max win observé (x mise)", X2),
+    ("globe", "Spins avec au moins 1 globe", PCT),
+    ("etl40b", "3 étoiles : etl40b (limite 0,9)", "0.000"),
+    ("etl10k", "3 étoiles : etl10k (limite 0,8)", "0.000"),
+    ("pmax", "Max win atteint : 1 tour sur", NUM),
+    # probabilité par spin d'un tour bonus, selon le critère SDK (grille de départ) et le bonus obtenu
+    *[(f"joint{c}{k}", None, "0.000000%") for c in (1, 2, 3) for k in (1, 2, 3)],
+]
+LIGNES_BONUS = [  # colonnes B, C, D = bonus 1, 2, 3 (sessions jouées directement, comme un achat)
+    ("b_sessions", "Sessions simulées", NUM),
+    ("b_prix", "Prix d'achat (x mise)", NUM),
+    ("b_gain", "Gain moyen (x mise)", X2),
+    ("b_rtp", "RTP au prix actuel", PCT),
+    ("b_conseil", "Prix conseillé (gain moyen / RTP cible)", "0.0"),
+    ("b_mediane", "Gain médian (x mise)", X2),
+    ("b_max", "Max win observé (x mise)", X2),
+    ("b_etl40b", "3 étoiles : etl40b (limite 0,9)", "0.000"),
+    ("b_etl10k", "3 étoiles : etl10k (limite 0,8)", "0.000"),
+]
+SIM_LIGNE = {k: 5 + i for i, (k, _, _) in enumerate(LIGNES_MODE)}
+SIM_BONUS0 = 5 + len(LIGNES_MODE) + 2          # ligne d'en-tête du bloc des bonus
+SIM_LIGNE.update({k: SIM_BONUS0 + 1 + i for i, (k, _, _) in enumerate(LIGNES_BONUS)})
+SIM_SYM0 = SIM_BONUS0 + len(LIGNES_BONUS) + 3   # ligne d'en-tête du RTP par symbole
+COL_MODE = {"base": "B", "boost": "C"}
+COL_BONUS = {1: "B", 2: "C", 3: "D"}
 
-    rounds = []
-    base_total = fs_total = 0.0
-    globe_spins = globe_gain = 0.0
-    nb_bonus = fs_joues = 0
-    sym_base = np.zeros(len(p["codes"]))
-    sym_fs = np.zeros(len(p["codes"]))
-    fait = 0
-    while fait < spins:
-        n = min(lot, spins - fait)
-        g, tr, a_globe, ps = m.spin(n, "base")
-        sym_base += ps
-        bonus = np.zeros(n)
-        decl = tr >= p["scatter_min"]
-        if decl.any():
-            tot, joues, psf = m.sessions_fs(m.fs_initiaux(tr[decl]), cap)
-            bonus[decl] = tot
-            sym_fs += psf
-            nb_bonus += int(decl.sum())
-            fs_joues += int(joues.sum())
-        r = np.minimum(g + bonus, cap)
-        # la part plafonnée est retirée du bonus en priorité
-        bonus_eff = r - np.minimum(g, cap)
-        base_total += np.minimum(g, cap).sum()
-        fs_total += bonus_eff.sum()
-        globe_spins += a_globe.sum()
-        globe_gain += np.minimum(g, cap)[a_globe].sum()
-        rounds.append(r)
-        fait += n
-        if verbose:
-            print(f"\r  jeu de base : {fait:,}/{spins:,} spins", end="", file=sys.stderr)
-    if verbose:
-        print(file=sys.stderr)
-    rounds = np.concatenate(rounds)
 
-    buy_tot = np.array([])
-    if buy:
-        parts = []
-        for i in range(0, buy, lot // 10):
-            k = min(lot // 10, buy - i)
-            t, _, _ = m.sessions_fs(np.full(k, p["buy_fs"]), cap)
-            parts.append(t)
-            if verbose:
-                print(f"\r  bonus buy : {i + k:,}/{buy:,} sessions", end="", file=sys.stderr)
-        if verbose:
-            print(file=sys.stderr)
-        buy_tot = np.concatenate(parts)
+def cellule(cle, col):
+    """Adresse d'une cellule de l'onglet Simulation (ex. cellule("rtp_total", "B") -> "B10")."""
+    return f"{col}{SIM_LIGNE[cle]}"
 
-    N = len(rounds)
+
+def _stats_ponderees(r, w, cout, cap):
+    """Statistiques d'un tableau de gains r (x mise) avec des poids w (somme 1)."""
+    moy = float((w * r).sum())
+    return {
+        "moy": moy,
+        "hit": float(w[r > 0].sum()),
+        "ecart_type": float(np.sqrt(max((w * r * r).sum() - moy * moy, 0.0))),
+        "etl40b": float((w * r)[r >= 40 * cout].sum()),
+        "etl10k": float((w * r)[r >= 10_000].sum()),
+        "p_max": float(w[r >= cap].sum()),
+        "max": float(r.max()) if len(r) else float("nan"),
+    }
+
+
+def _distribution(r, w, cap):
     bornes = DIST_BORNES + [cap]
-    dist = [("0 x", float((rounds == 0).mean()))]
+    dist = [("0 x", float(w[r == 0].sum()))]
     for lo, hi in zip(bornes[:-1], bornes[1:]):
         lbl = f"{lo:g} – {hi:g} x" if hi < cap else f"{lo:g} x – max win"
-        sel = (rounds > lo) & (rounds < hi) if lo == 0 else (rounds >= lo) & (rounds < hi)
-        dist.append((lbl, float(sel.mean())))
-    dist.append(("Max win atteint", float((rounds >= cap).mean())))
+        sel = (r > lo) & (r < hi) if lo == 0 else (r >= lo) & (r < hi)
+        dist.append((lbl, float(w[sel].sum())))
+    dist.append(("Max win atteint", float(w[r >= cap].sum())))
+    return dist
 
+
+def jouer_mode(m, phase, spins, cout, lot=100_000, verbose=True, tours=False):
+    """Simule un mode de jeu (base ou boost) par strates : la loi du nombre de symboles bonus sur la
+    grille de départ est exacte, et chaque strate (0, 1, … 5 symboles bonus) est simulée à part, les
+    strates qui déclenchent un bonus étant sur-échantillonnées (le bonus caché est très rare).
+    Les résultats sont recombinés avec les vraies probabilités."""
+    p = m.p
+    cap = p["max_win"]
+    nb = len(p["bonus"])
+    loi = m.loi_depart(phase)
+    seuil = p["bonus"][0]["bn"]
+    n_min = max(spins // 100, 2000)               # au moins ça par strate qui déclenche un bonus
+    rounds, poids = [], []
+    tot = {"base": 0.0, "fs": 0.0, "globe": 0.0}
+    par_type = np.zeros((nb + 1, 3))               # [type] -> (proba, gain bonus, FS joués) pondérés
+    joint = np.zeros((4, 4))
+    sym_base = np.zeros(len(p["codes"]))
+    sym_fs = np.zeros(len(p["codes"]))
+    var_rtp = 0.0
+    for j, pj in enumerate(loi):
+        if pj <= 0:
+            continue
+        n_j = max(int(round(spins * pj)), n_min if j >= seuil else 1)
+        w_j = pj / n_j
+        r_j = []
+        fait = 0
+        while fait < n_j:
+            n = min(lot, n_j - fait)
+            g, n_bn, a_globe, ps, n_dep = m.spin(n, phase, force_bn=j)
+            typ = m.type_bonus(n_bn)
+            crit = m.critere(n_dep)
+            bonus = np.zeros(n)
+            joues = np.zeros(n)
+            for k in range(1, nb + 1):
+                sel = typ == k
+                if sel.any():
+                    t, jo, psf = m.sessions_fs(np.full(int(sel.sum()), p["bonus"][k - 1]["fs"]), cap, f"fs{k}")
+                    bonus[sel], joues[sel] = t, jo
+                    sym_fs += w_j * psf
+            r = np.minimum(g + bonus, cap)
+            bonus_eff = r - np.minimum(g, cap)     # la part plafonnée est retirée du bonus en priorité
+            tot["base"] += w_j * np.minimum(g, cap).sum()
+            tot["fs"] += w_j * bonus_eff.sum()
+            tot["globe"] += w_j * a_globe.sum()
+            np.add.at(par_type, (typ, 0), w_j)
+            np.add.at(par_type, (typ, 1), w_j * bonus_eff)
+            np.add.at(par_type, (typ, 2), w_j * joues)
+            dec = typ > 0
+            np.add.at(joint, (crit[dec], typ[dec]), w_j)
+            sym_base += w_j * ps
+            r_j.append(r)
+            fait += n
+            if verbose:
+                print(f"\r  {phase} : strate {j} symbole(s) bonus au départ, {fait:,}/{n_j:,} spins   ",
+                      end="", file=sys.stderr)
+        r_j = np.concatenate(r_j)
+        var_rtp += pj * pj * r_j.var() / len(r_j)
+        rounds.append(r_j)
+        poids.append(np.full(len(r_j), w_j))
+    if verbose:
+        print(file=sys.stderr)
+    r, w = np.concatenate(rounds), np.concatenate(poids)
+    s = _stats_ponderees(r, w, cout, cap)
     res = {
-        "date": dt.datetime.now().strftime("%Y-%m-%d %H:%M"),
-        "spins": N,
-        "sessions_buy": len(buy_tot),
-        "rtp_base": base_total / N,
-        "rtp_fs": fs_total / N,
-        "rtp_total": rounds.mean(),
-        "erreur_std": rounds.std() / np.sqrt(N),
-        "hit_freq": float((rounds > 0).mean()),
-        "ecart_type": float(rounds.std()),
-        "trigger_1_sur": N / nb_bonus if nb_bonus else float("nan"),
-        "fs_moyens": fs_joues / nb_bonus if nb_bonus else float("nan"),
-        "gain_bonus_naturel": fs_total / nb_bonus if nb_bonus else float("nan"),
-        "gain_bonus_buy": float(buy_tot.mean()) if len(buy_tot) else float("nan"),
-        "rtp_buy": float(buy_tot.mean() / p["buy_cout"]) if len(buy_tot) else float("nan"),
-        "max_observe": float(rounds.max()),
-        "max_observe_buy": float(buy_tot.max()) if len(buy_tot) else float("nan"),
-        "freq_globe": globe_spins / N,
-        "rtp_spins_globe": globe_gain / N,
-        "sym_base": sym_base / N,
-        "sym_fs": sym_fs / N,
-        "dist": dist,
+        "spins": int(len(r)), "cout": cout,
+        "rtp_base": tot["base"] / cout, "rtp_fs": tot["fs"] / cout, "rtp_total": s["moy"] / cout,
+        "marge": 1.96 * np.sqrt(var_rtp) / cout, "hit": s["hit"], "ecart_type": s["ecart_type"],
+        "trig": 1 / par_type[1:, 0].sum(), "max": s["max"], "globe": tot["globe"],
+        "etl40b": s["etl40b"], "etl10k": s["etl10k"],
+        "pmax": 1 / s["p_max"] if s["p_max"] > 0 else float("nan"),
+        "dist": _distribution(r, w, cap), "sym_base": sym_base, "sym_fs": sym_fs,
+        "joint": joint[1:, 1:].tolist(),
     }
+    if tours:                                      # gains et poids de chaque tour simulé (pour le calage)
+        res["tours"] = (r, w)
+    for k in range(1, 4):
+        ok = k <= nb and par_type[k, 0] > 0
+        res[f"trig{k}"] = 1 / par_type[k, 0] if ok else float("nan")
+        res[f"gain{k}"] = par_type[k, 1] / par_type[k, 0] if ok else float("nan")
+        res[f"fsm{k}"] = par_type[k, 2] / par_type[k, 0] if ok else float("nan")
+    for c in (1, 2, 3):
+        for k in (1, 2, 3):
+            res[f"joint{c}{k}"] = float(joint[c, k])
     return res
 
 
+def jouer_bonus(m, k, sessions, lot=10_000, verbose=True):
+    """Joue des tours « bonus k » directement, comme un achat : spin de déclenchement (grille de base
+    avec le seuil de symboles bonus du bonus k), puis les FS du bonus k."""
+    p = m.p
+    cap = p["max_win"]
+    b = p["bonus"][k - 1]
+    parts = []
+    for i in range(0, sessions, lot):
+        n = min(lot, sessions - i)
+        g = m.spin(n, "base", force_bn=b["bn"])[0]
+        t, _, _ = m.sessions_fs(np.full(n, b["fs"]), cap, f"fs{k}")
+        parts.append(np.minimum(g + t, cap))
+        if verbose:
+            print(f"\r  bonus {k} : {i + n:,}/{sessions:,} sessions", end="", file=sys.stderr)
+    if verbose:
+        print(file=sys.stderr)
+    t = np.concatenate(parts)
+    w = np.full(len(t), 1 / len(t))
+    prix = b["prix"]
+    s = _stats_ponderees(t, w, prix or 1.0, cap)
+    return {
+        "b_sessions": len(t), "b_prix": prix, "b_gain": s["moy"],
+        "b_rtp": s["moy"] / prix if prix else None,
+        "b_conseil": s["moy"] / p["rtp_cible"],
+        "b_mediane": float(np.median(t)), "b_max": s["max"],
+        "b_etl40b": s["etl40b"] if prix else None, "b_etl10k": s["etl10k"] if prix else None,
+        "dist": _distribution(t, w, cap),
+    }
+
+
+def simuler(p, spins=None, boost=None, buy=None, verbose=True):
+    rng = np.random.default_rng(p["seed"])
+    m = Moteur(p, rng)
+    spins = spins or p["sim_spins"]
+    boost = p["sim_boost"] if boost is None else boost
+    buy = p["sim_buy"] if buy is None else buy
+    res = {"date": dt.datetime.now().strftime("%Y-%m-%d %H:%M"), "modes": {}, "bonus": {}}
+    res["modes"]["base"] = jouer_mode(m, "base", spins, 1.0, verbose=verbose)
+    if boost:
+        res["modes"]["boost"] = jouer_mode(m, "boost", boost, p["boost_cout"], verbose=verbose)
+    if buy:
+        for k in range(1, len(p["bonus"]) + 1):
+            res["bonus"][k] = jouer_bonus(m, k, buy, verbose=verbose)
+    return res
+
+
+def _f(v, fmt):
+    return "-" if v is None or v != v else format(v, fmt)
+
+
 def afficher(p, r):
-    print(f"Spins simulés          : {r['spins']:,}")
-    print(f"RTP jeu de base        : {r['rtp_base']:.4%}")
-    print(f"RTP free spins         : {r['rtp_fs']:.4%}")
-    print(f"RTP total              : {r['rtp_total']:.4%}  (± {1.96 * r['erreur_std']:.3%} à 95 %)"
-          f"  cible {p['rtp_cible']:.2%}")
-    print(f"Hit frequency          : {r['hit_freq']:.2%}")
-    print(f"Écart-type (x mise)    : {r['ecart_type']:.2f}")
-    print(f"Bonus 1 spin sur       : {r['trigger_1_sur']:.0f}")
-    print(f"FS moyens / bonus      : {r['fs_moyens']:.2f}")
-    print(f"Gain moyen bonus       : {r['gain_bonus_naturel']:.2f} x")
-    print(f"Gain moyen bonus buy   : {r['gain_bonus_buy']:.2f} x  -> RTP buy {r['rtp_buy']:.2%}")
-    print(f"Spins avec globe       : {r['freq_globe']:.2%}")
-    print(f"Max win observé        : {r['max_observe']:.1f} x (base)  /  "
-          f"{r['max_observe_buy']:.1f} x (buy)")
+    noms = {"base": "JEU DE BASE (1x)", "boost": f"SPINS BOOSTÉS ({p['boost_cout']:g}x)"}
+    for mode, s in r["modes"].items():
+        print(f"\n{noms[mode]} — {s['spins']:,} spins simulés")
+        print(f"  RTP total        : {s['rtp_total']:.3%}  (± {s['marge']:.3%})  cible {p['rtp_cible']:.2%}"
+              f"   [spins {s['rtp_base']:.2%} + bonus {s['rtp_fs']:.2%}]")
+        print(f"  Hit frequency    : {s['hit']:.2%}   écart-type {s['ecart_type']:.1f}x   max {s['max']:.0f}x")
+        print(f"  Bonus            : 1 spin sur {s['trig']:.0f}")
+        for k, b in enumerate(p["bonus"], 1):
+            print(f"    {k}. {b['nom']:<16}: 1 spin sur {_f(s[f'trig{k}'], ',.0f'):>9}, gain moyen "
+                  f"{_f(s[f'gain{k}'], '.1f')}x, {_f(s[f'fsm{k}'], '.1f')} FS joués")
+        print(f"  3 étoiles        : etl40b {s['etl40b']:.3f} (≤ 0,9)  etl10k {s['etl10k']:.3f} (≤ 0,8)  "
+              f"max win 1 tour sur {_f(s['pmax'], ',.0f')}")
+    for k, s in r["bonus"].items():
+        b = p["bonus"][k - 1]
+        prix = f"prix {b['prix']:g}x -> RTP {s['b_rtp']:.2%}" if b["prix"] else "non achetable"
+        print(f"\nBONUS {k} ({b['nom']}) joué directement, {s['b_sessions']:,} sessions : gain moyen "
+              f"{s['b_gain']:.1f}x, médiane {s['b_mediane']:.1f}x, max {s['b_max']:.0f}x ; {prix} "
+              f"(prix conseillé {s['b_conseil']:.0f}x)")
+        if b["prix"]:
+            print(f"  3 étoiles : etl40b {s['b_etl40b']:.3f} (≤ 0,9)  etl10k {s['b_etl10k']:.3f} (≤ 0,8)")
 
 
 # --------------------------------------------------------------------------- #
-# Écriture dans l'onglet Simulation (cellules fixes, voir le classeur)
+# Écriture dans l'onglet Simulation (disposition : LIGNES_MODE / LIGNES_BONUS)
 # --------------------------------------------------------------------------- #
+def libelle_joint(p, c, k):
+    b = p["bonus"]
+    if c > len(b) or k > len(b):
+        return f"(critère {c}, bonus {k} : inutilisé)"
+    dep = f"{b[c - 1]['bn']} symboles bonus" if c > 1 else f"{b[0]['bn']} symboles bonus ou moins"
+    return f"P(départ {dep} → bonus {k})"
+
+
 def ecrire(path, p, r):
     wb = load_workbook(path)
     ws = wb["Simulation"]
-    valeurs = [r["date"], r["spins"], r["sessions_buy"], r["rtp_base"], r["rtp_fs"],
-               r["rtp_total"], 1.96 * r["erreur_std"], r["hit_freq"], r["ecart_type"],
-               r["trigger_1_sur"], r["fs_moyens"], r["gain_bonus_naturel"],
-               r["gain_bonus_buy"], r["rtp_buy"], r["max_observe"], r["max_observe_buy"],
-               r["freq_globe"], r["rtp_spins_globe"]]
-    for i, v in enumerate(valeurs):
-        ws.cell(row=5 + i, column=2, value=v if v == v else None)  # NaN -> vide
 
-    # Contribution par symbole : lignes 27+
+    def put(row, col, v, fmt=None):
+        c = ws[f"{col}{row}"]
+        c.value = None if v is None or (isinstance(v, float) and v != v) else v
+        if fmt:
+            c.number_format = fmt
+
+    for key, lbl, fmt in LIGNES_MODE:
+        row = SIM_LIGNE[key]
+        if key.startswith("joint"):
+            lbl = libelle_joint(p, int(key[5]), int(key[6]))
+        put(row, "A", lbl)
+        for mode, col in COL_MODE.items():
+            s = r["modes"].get(mode)
+            v = (r["date"] if key == "date" else s.get(key)) if s else None
+            put(row, col, v, fmt)
+    for key, lbl, fmt in LIGNES_BONUS:
+        row = SIM_LIGNE[key]
+        put(row, "A", lbl)
+        for k, col in COL_BONUS.items():
+            s = r["bonus"].get(k)
+            put(row, col, s.get(key) if s else None, fmt)
+
+    # Distribution des gains : F = tranche, G = base, H = boost
+    for i in range(15):
+        for col in "FGH":
+            put(5 + i, col, None)
+    for mode, col in (("base", "G"), ("boost", "H")):
+        s = r["modes"].get(mode)
+        if not s:
+            continue
+        for i, (lbl, v) in enumerate(s["dist"]):
+            put(5 + i, "F", lbl)
+            put(5 + i, col, v, "0.0000%")
+
+    # RTP par symbole (jeu de base) : lignes SIM_SYM0 + 1 et suivantes
     for i in range(30):
-        for col in (1, 2, 3, 4):
-            ws.cell(row=27 + i, column=col, value=None)
+        for col in "ABCD":
+            put(SIM_SYM0 + 1 + i, col, None)
+    s = r["modes"]["base"]
     j = 0
-    for s, t in enumerate(p["types"]):
+    for i, t in enumerate(p["types"]):
         if t != "PAY":
             continue
-        ws.cell(row=27 + j, column=1, value=p["codes"][s])
-        ws.cell(row=27 + j, column=2, value=p["noms"][s])
-        ws.cell(row=27 + j, column=3, value=float(r["sym_base"][s]))
-        ws.cell(row=27 + j, column=4, value=float(r["sym_fs"][s]))
+        row = SIM_SYM0 + 1 + j
+        put(row, "A", p["codes"][i])
+        put(row, "B", p["noms"][i])
+        put(row, "C", float(s["sym_base"][i]), PCT)
+        put(row, "D", float(s["sym_fs"][i]), PCT)
         j += 1
-
-    # Distribution des gains : colonnes F:G, lignes 5+
-    for i in range(15):
-        ws.cell(row=5 + i, column=6, value=None)
-        ws.cell(row=5 + i, column=7, value=None)
-    for i, (lbl, v) in enumerate(r["dist"]):
-        ws.cell(row=5 + i, column=6, value=lbl)
-        ws.cell(row=5 + i, column=7, value=v)
 
     wb.calculation.fullCalcOnLoad = True  # Excel recalcule tout à l'ouverture
     wb.save(path)
+
+
+def lire_simulation(path):
+    """Relit l'onglet Simulation : {"base": {clé: valeur}, "boost": {...}, "bonus": {1: {...}, ...}}."""
+    ws = load_workbook(path)["Simulation"]
+    out = {mode: {k: ws[f"{col}{SIM_LIGNE[k]}"].value for k, _, _ in LIGNES_MODE}
+           for mode, col in COL_MODE.items()}
+    out["bonus"] = {k: {key: ws[f"{col}{SIM_LIGNE[key]}"].value for key, _, _ in LIGNES_BONUS}
+                    for k, col in COL_BONUS.items()}
+    return out
 
 
 def main():
@@ -620,12 +845,13 @@ def main():
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("classeur")
     ap.add_argument("--spins", type=int, help="remplace « Spins de base simulés »")
-    ap.add_argument("--buy", type=int, help="remplace « Sessions bonus buy simulées »")
+    ap.add_argument("--boost", type=int, help="remplace « Spins boostés simulés » (0 = pas de simulation)")
+    ap.add_argument("--buy", type=int, help="remplace « Sessions par bonus simulées » (0 = aucune)")
     ap.add_argument("--no-write", action="store_true", help="n'écrit pas dans le classeur")
     a = ap.parse_args()
 
     p = load_params(a.classeur)
-    r = simuler(p, spins=a.spins, buy=a.buy)
+    r = simuler(p, spins=a.spins, boost=a.boost, buy=a.buy)
     afficher(p, r)
     if not a.no_write:
         ecrire(a.classeur, p, r)

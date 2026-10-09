@@ -6,11 +6,12 @@ Exporte la feuille de calcul vers un jeu prêt pour le math SDK de Stake Engine.
     python exporter.py ma_feuille.xlsx --game-id 12_3_monjeu --nom "Mon Jeu"
 
 Écrit dans games/<game-id>/ :
-  - params.json      : paytable, lignes, multis, free spins, bonus buy, cibles d'optimisation
+  - params.json      : paytable, lignes, multis, les 3 bonus, spins boostés, bonus buy, cibles de pondération
   - reels/BR0.csv    : bandes du jeu de base (poids de l'onglet Poids = nombre d'occurrences)
-  - reels/FR0.csv    : bandes des free spins
+  - reels/BRB.csv    : bandes des spins boostés
+  - reels/FR1.csv, FR2.csv, FR3.csv : bandes des free spins de chaque bonus
   - reels/FRWCAP.csv : bandes FS enrichies en globes, utilisées seulement pour fabriquer
-                       des résultats « max win » (critère wincap de l'optimiseur)
+                       des résultats « max win » (critère wincap)
   - reels/PAD_BR.csv, PAD_FR.csv : bandes courtes (100 cases), seulement pour l'animation des
                        rouleaux côté front-end (config_fe) ; elles n'entrent pas dans les maths
 Les fichiers Python du jeu (game_config.py, gamestate.py…) sont recopiés depuis le
@@ -29,7 +30,8 @@ import simulateur  # noqa: E402  (lecture des plages nommées du classeur)
 
 MODELE = ICI / "games" / "0_0_globe"
 FICHIERS_JEU = ["game_config.py", "game_calculations.py", "game_executables.py", "game_override.py",
-                "game_events.py", "gamestate.py", "game_optimization.py", "run.py", "readme.txt"]
+                "game_events.py", "gamestate.py", "ponderation.py", "run.py", "readme.txt"]
+MODES_ACHAT = {1: "bonus", 2: "super", 3: "cache"}   # nom du mode de mise de chaque bonus buy
 COMBOS_SDK = {("CLUSTER", "WILD_ADD"), ("CLUSTER", "GLOBAL_SUM"), ("LINES", "WILD_ADD"), ("LINES", "GLOBAL_SUM"), ("WAYS", "WILD_MULT"), ("WAYS", "GLOBAL_SUM")}
 RESERVES = {"W", "MX"}
 WINCAP_BOOST_GLOBE = 10   # globes x10 sur la bande FRWCAP
@@ -40,13 +42,11 @@ def erreur(msg):
 
 
 def lire_simulation(path):
-    """Résultats de simulateur.py (onglet Simulation, cellules constantes)."""
-    from openpyxl import load_workbook
-    ws = load_workbook(path)["Simulation"]
-    v = {ws.cell(row=r, column=1).value: ws.cell(row=r, column=2).value for r in range(5, 23)}
-    need = ["RTP jeu de base (globe inclus)", "RTP free spins", "RTP total", "Hit frequency", "Bonus 1 spin sur"]
-    if any(not isinstance(v.get(k), (int, float)) for k in need):
-        erreur("l'onglet Simulation est vide : lance d'abord  python simulateur.py <classeur>")
+    """Résultats de simulateur.py (onglet Simulation)."""
+    v = simulateur.lire_simulation(path)
+    for mode in ("base", "boost"):
+        if not isinstance(v[mode].get("rtp_total"), (int, float)):
+            erreur(f"l'onglet Simulation est vide ({mode}) : lance d'abord  python simulateur.py <classeur>")
     return v
 
 
@@ -137,17 +137,11 @@ def main():
         erreur("il faut un symbole de type GLOBE.")
     globe = codes[types.index("GLOBE")]
     pay_codes = [c for c, t in zip(codes, types) if t == "PAY"]
-    table = dict(p["table_fs"])
-    if min(table) != p["scatter_min"]:
-        erreur("SCATTER_MIN doit être égal au premier seuil de la table des FS.")
-    if max(table) > 5:
-        erreur("au plus 1 symbole bonus par rouleau dans le SDK : la table des FS ne peut pas dépasser 5 symboles bonus.")
     if p["fs_par_bonus"] != int(p["fs_par_bonus"]) or p["fs_par_bonus"] < 1:
         erreur("FS_PAR_BONUS doit être un entier >= 1.")
-    for nom in ("poids_base", "poids_fs"):
-        w = p[nom]
+    for nom, w in p["poids"].items():
         if (abs(w - w.round()) > 1e-9).any():
-            erreur(f"{nom} : les poids doivent être des entiers (= nombre d'occurrences sur la bande).")
+            erreur(f"poids {nom} : les poids doivent être des entiers (= nombre d'occurrences sur la bande).")
 
     dossier = ICI / "games" / a.game_id
     (dossier / "reels").mkdir(parents=True, exist_ok=True)
@@ -162,36 +156,37 @@ def main():
         L = int(poids.sum(axis=0).max())   # même longueur pour les 5 rouleaux
         return [bande(poids[:, r], codes, L, rows, scatter, rng) for r in range(5)]
 
-    br = bandes(p["poids_base"])
-    fr = bandes(p["poids_fs"])
-    wcap_poids = p["poids_fs"].copy()
+    nb_bonus = len(p["bonus"])
+    br = bandes(p["poids"]["base"])
+    bb = bandes(p["poids"]["boost"])
+    frs = [bandes(p["poids"][f"fs{k + 1}"]) for k in range(nb_bonus)]
+    wcap_poids = p["poids"][f"fs{min(2, nb_bonus)}"].copy()
     wcap_poids[codes.index(globe)] *= WINCAP_BOOST_GLOBE
     wc = bandes(wcap_poids)
     ecrire_bandes(dossier / "reels" / "BR0.csv", br)
-    ecrire_bandes(dossier / "reels" / "FR0.csv", fr)
+    ecrire_bandes(dossier / "reels" / "BRB.csv", bb)
+    for k, fr in enumerate(frs):
+        ecrire_bandes(dossier / "reels" / f"FR{k + 1}.csv", fr)
     ecrire_bandes(dossier / "reels" / "FRWCAP.csv", wc)
+    ancien = dossier / "reels" / "FR0.csv"
+    if ancien.exists():
+        ancien.unlink()
     # Bandes d'affichage (tirées après les autres pour ne pas changer les bandes de maths)
-    for nom, poids in (("PAD_BR.csv", p["poids_base"]), ("PAD_FR.csv", p["poids_fs"])):
+    for nom, poids in (("PAD_BR.csv", p["poids"]["base"]), ("PAD_FR.csv", p["poids"]["fs1"])):
         ecrire_bandes(dossier / "reels" / nom,
                       [bande(poids[:, r], codes, 100, rows, scatter, rng) for r in range(5)])
 
-    # Probabilités naturelles de 3/4/5 symboles bonus : servent à forcer le bonus avec les bonnes proportions
-    dist = proba_bonus(br, scatter, rows)
-    seuils = sorted(table)
-    trig = {}
-    for i, s in enumerate(seuils):
-        hi = seuils[i + 1] if i + 1 < len(seuils) else 6
-        trig[str(s)] = round(sum(dist[s:hi]), 10)
-
-    # Cibles d'optimisation tirées de la simulation de la feuille
     rtp = round(p["rtp_cible"], 4)
-    rtp_wincap = 0.001
-    part_fs = sim["RTP free spins"] / sim["RTP total"]
-    rtp_fs = round((rtp - rtp_wincap) * part_fs, 4)
-    rtp_bg = round(rtp - rtp_wincap - rtp_fs, 4)
     mv = lambda poids: {str(int(v) if float(v).is_integer() else v): float(w)
                         for v, w in zip(p["multi_val"], poids) if w > 0}
-    wcap_mult = p["multi_w_fs"] * p["multi_val"]          # multis plus forts pour les résultats max win
+    bonuses = []
+    for k, b in enumerate(p["bonus"], 1):
+        bonuses.append({
+            "id": k, "name": b["nom"], "scatters": b["bn"], "spins": b["fs"],
+            "guaranteed_globe": b["globe_garanti"], "buy_cost": b["prix"],
+            "mode": MODES_ACHAT[k] if b["prix"] else None,
+            "reels": f"FR{k}", "mult_values": mv(p["multi_w"][f"fs{k}"]),
+        })
 
     if gain == "CLUSTER":
         # Une entrée par taille de cluster (kind = taille), comme convert_range_table du SDK
@@ -228,18 +223,18 @@ def main():
         "globe": globe,
         "globe_multiplier": p["multi_globe"],
         "paylines": p["lignes"].tolist(),
-        "fs_triggers_base": {str(k): v for k, v in table.items()},
         "fs_per_scatter_in_fs": int(p["fs_par_bonus"]),
-        "scatter_trigger_weights": trig,
-        "mult_values": {"basegame": mv(p["multi_w_base"]), "freegame": mv(p["multi_w_fs"]),
-                        "wincap": mv(wcap_mult)},
-        "buy": {"cost": p["buy_cout"], "spins": p["buy_fs"]},
+        "bonuses": bonuses,
+        "boost": {"cost": p["boost_cout"]},
+        "mult_values": {"basegame": mv(p["multi_w"]["base"])},
         "targets": {
-            "wincap_rtp": rtp_wincap,
-            "freegame_rtp": rtp_fs,
-            "freegame_hr": round(float(sim["Bonus 1 spin sur"]), 2),
-            "basegame_rtp": rtp_bg,
-            "basegame_hr": round(1 / float(sim["Hit frequency"]), 3),
+            # Part du RTP donnée au max win, puis probabilité réelle de chaque tour bonus (simulée par la
+            # feuille) selon le critère SDK (grille de départ) et le bonus obtenu : voir ponderation.py
+            "wincap_rtp": 0.001,
+            "base": {"joint": [[sim["base"][f"joint{c}{k}"] or 0.0 for k in (1, 2, 3)][:nb_bonus]
+                               for c in (1, 2, 3)][:nb_bonus]},
+            "boost": {"joint": [[sim["boost"][f"joint{c}{k}"] or 0.0 for k in (1, 2, 3)][:nb_bonus]
+                                for c in (1, 2, 3)][:nb_bonus]},
         },
     }
     with open(dossier / "params.json", "w", encoding="utf-8") as f:
@@ -249,10 +244,16 @@ def main():
     detail = {"LINES": f"{len(params['paylines'])} lignes", "WAYS": f"{rows ** 5} ways",
               "CLUSTER": f"clusters de {p['tailles'][0]}+, cascades {'oui' if params['cascades'] else 'non'}"}[gain]
     print(f"  mode {gain} + {mode}, {detail}, max win {p['max_win']:g}x, RTP cible {rtp:.2%}")
-    print(f"  bandes : base {len(br[0])} cases, FS {len(fr[0])} cases ; "
-          f"bonus naturel 1 spin sur {1 / sum(dist[min(table):]):.0f}")
-    print(f"  cibles : base {rtp_bg:.4f} (hr {params['targets']['basegame_hr']}), "
-          f"FS {rtp_fs:.4f} (1/{params['targets']['freegame_hr']}), wincap {rtp_wincap}")
+    for nom, bd in (("base", br), ("boost", bb)):
+        dist = proba_bonus(bd, scatter, rows)
+        print(f"  bandes {nom} : {len(bd[0])} cases ; grille de départ : " + ", ".join(
+            f"bonus {k} 1 spin sur {1 / sum(dist[b['bn']:(p['bonus'][k]['bn'] if k < nb_bonus else 6)]):,.0f}"
+            for k, b in enumerate(p["bonus"], 1)))
+    for b in bonuses:
+        achat = f"achat {b['buy_cost']:g}x (mode « {b['mode']} »)" if b["buy_cost"] else "non achetable"
+        print(f"  bonus {b['id']} « {b['name']} » : {b['scatters']} symboles bonus, {b['spins']} FS, "
+              f"globe garanti {'oui' if b['guaranteed_globe'] else 'non'}, {achat}")
+    print(f"  spins boostés (mode « boost ») : {p['boost_cout']:g}x la mise")
 
 
 if __name__ == "__main__":
