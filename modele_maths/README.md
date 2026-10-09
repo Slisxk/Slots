@@ -8,7 +8,7 @@ Base de calcul pour une slot. Les symboles sont génériques : tu fais ta propre
 - **Cascades** : les clusters gagnants explosent, les symboles tombent et de nouveaux arrivent, jusqu'à ce qu'il n'y ait plus de gain.
 - **Globe** : quand il arrive sur la grille, au départ ou pendant une cascade, ses 8 voisins deviennent des **wilds multiplicateurs**. Le multi d'un cluster est la somme des multis qu'il contient.
 - **3 bonus** : 3 symboles bonus = bonus 1, 4 = bonus 2 (plus de globes, multis plus forts), 5 = bonus 3, le **bonus caché** (5 FS, un globe garanti à chaque FS). Pendant les FS, chaque symbole bonus donne **+1 FS**.
-- **Spins boostés** : un spin plus cher (1,5x la mise) avec plus de symboles bonus, donc environ 2 fois plus de bonus.
+- **Spins boostés** : un spin plus cher (1,25x la mise) avec plus de symboles bonus, donc environ 1,6 fois plus de bonus.
 - **Bonus buy** : bonus 1 et bonus 2 (le bonus caché ne s'achète pas).
 
 | Fichier | Rôle |

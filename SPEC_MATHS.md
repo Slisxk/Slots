@@ -60,8 +60,8 @@ Les symboles bonus `BN`, les globes `GL` et les wilds `W` déjà posés ne sont 
    - **4 symboles bonus → Bonus 2 « Super free spins »** : 12 free spins, encore plus de globes et des multiplicateurs plus forts (jusqu'à ×100).
    - **5 symboles bonus ou plus → Bonus 3, le bonus caché** : 5 free spins, avec **un globe garanti sur chaque free spin** (s'il n'y en a pas au départ, une case au hasard devient un globe avant que la grille s'affiche). Ses multiplicateurs sont plus petits (×1 à ×5), mais un globe à chaque spin fait de gros gains.
    - Pendant les free spins des 3 bonus, chaque symbole bonus présent à la fin d'un spin ajoute 1 free spin (le bonus ne change pas).
-7. **Spins boostés** : pour 1,5 × la mise par spin, les rouleaux ont plus de symboles bonus : les bonus arrivent environ 2,3 fois plus souvent. Tout le reste est identique au jeu de base.
-8. **Bonus buy** : Bonus 1 pour 61 × la mise, Bonus 2 pour 160 × la mise. Le tour commence par un spin de déclenchement avec 3 (ou 4) symboles bonus, qui peut lui-même gagner (cascades et globes compris). Le bonus caché ne s'achète pas.
+7. **Spins boostés** : pour 1,25 × la mise par spin, les rouleaux ont plus de symboles bonus : les bonus arrivent environ 1,6 fois plus souvent. Tout le reste est identique au jeu de base.
+8. **Bonus buy** : Bonus 1 pour 59 × la mise, Bonus 2 pour 160 × la mise. Le tour commence par un spin de déclenchement avec 3 (ou 4) symboles bonus, qui peut lui-même gagner (cascades et globes compris). Le bonus caché ne s'achète pas.
 9. **Max win** : le gain d'un tour (spin + free spins) est plafonné à 10 000 × la mise. Quand le plafond est atteint, le tour s'arrête immédiatement.
 10. Les gains sont exprimés en multiples de la mise totale. Les mauvais fonctionnements annulent tous les gains et jeux.
 
@@ -99,8 +99,8 @@ Gain d'un cluster = valeur ci-dessus × multiplicateur du cluster.
 | Mode | Coût | Type | Contenu |
 |---|---|---|---|
 | `base` | 1 × la mise | spin | spin normal (peut déclencher les 3 bonus) |
-| `boost` | 1,5 × la mise | spin (option activable, comme une « ante bet ») | spins boostés : bonus environ 2,3 fois plus fréquents |
-| `bonus` | 61 × la mise | achat | Bonus 1 « Free spins » directement |
+| `boost` | 1,25 × la mise | spin (option activable, comme une « ante bet ») | spins boostés : bonus environ 1,6 fois plus fréquents |
+| `bonus` | 59 × la mise | achat | Bonus 1 « Free spins » directement |
 | `super` | 160 × la mise | achat | Bonus 2 « Super free spins » directement |
 
 Le bonus caché ne s'achète pas : il ne se déclenche qu'avec 5 symboles bonus, en mode `base` ou `boost`. Côté interface, `boost` est un interrupteur qui reste activé d'un spin à l'autre ; `bonus` et `super` sont deux boutons d'achat.
