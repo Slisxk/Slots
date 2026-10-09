@@ -69,10 +69,10 @@ def _contraindre(evaluer):
     l40 = l10k = 0.0
     e40, e10 = evaluer(0.0, 0.0)
     if e40 > ETL40_LIMITE:
-        l40 = _bisection(lambda x: ETL40_CIBLE - evaluer(x, 0.0)[0], -60.0, 0.0)
+        l40 = _bisection(lambda x: evaluer(x, 0.0)[0] - ETL40_CIBLE, -60.0, 0.0)
         e40, e10 = evaluer(l40, 0.0)
     if e10 > ETL10K_LIMITE:
-        l10k = _bisection(lambda x: ETL10K_CIBLE - evaluer(l40, x)[1], -60.0, 0.0)
+        l10k = _bisection(lambda x: evaluer(l40, x)[1] - ETL10K_CIBLE, -60.0, 0.0)
     return l40, l10k
 
 
