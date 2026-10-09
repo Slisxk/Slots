@@ -16,9 +16,10 @@ Le principe :
 stake_math/
 ├── exporter.py            feuille de calcul -> params.json + bandes de rouleaux
 ├── verifier_sdk.py        compare le simulateur de la feuille au SDK (gains exacts + cascades)
+├── sortie/                config front-end + statistiques de la dernière génération SDK
 └── games/0_0_globe/       le jeu, au format d'un dossier games/ du math SDK
     ├── params.json        (généré) paytable, lignes, multis, FS, bonus buy, cibles RTP
-    ├── reels/*.csv        (généré) bandes BR0 (base), FR0 (FS), FRWCAP (max win)
+    ├── reels/*.csv        (généré) bandes BR0 (base), FR0 (FS), FRWCAP (max win), PAD_* (animation)
     ├── game_config.py     modes de mise, distributions, symboles spéciaux
     ├── gamestate.py       déroulé d'un tour (base + free spins)
     ├── game_executables.py  transformation autour du globe + calcul des gains
@@ -32,7 +33,7 @@ stake_math/
 1. **Régler la feuille** : modifie les cellules bleues, puis lance `python simulateur.py modele_maths.xlsx` jusqu'à voir « OK » dans le Résumé.
 2. **Exporter** :
    ```bash
-   python exporter.py ../modele_maths/modele_maths.xlsx --game-id 0_0_globe --nom "Mon Jeu"
+   python exporter.py ../modele_maths/modele_maths.xlsx --game-id 0_0_globe --nom "Mon Jeu" --studio mon_studio
    ```
    Avec un autre `--game-id`, les fichiers Python sont recopiés dans `games/<game-id>/`.
 3. **Installer le math SDK** (Python 3.12+, et Rust/Cargo pour l'optimiseur), à la racine de ce repo, à côté de `stake_math/` :

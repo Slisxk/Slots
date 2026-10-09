@@ -2,6 +2,7 @@
   "_info": "Généré par exporter.py depuis la feuille de calcul. Ne pas éditer à la main : modifie la feuille puis relance l'export.",
   "game_id": "0_0_globe",
   "provider_number": 0,
+  "provider_name": "mon_studio",
   "working_name": "Globe Multipliers",
   "rtp": 0.96,
   "wincap": 10000.0,

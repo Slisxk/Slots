@@ -11,6 +11,8 @@ Exporte la feuille de calcul vers un jeu prêt pour le math SDK de Stake Engine.
   - reels/FR0.csv    : bandes des free spins
   - reels/FRWCAP.csv : bandes FS enrichies en globes, utilisées seulement pour fabriquer
                        des résultats « max win » (critère wincap de l'optimiseur)
+  - reels/PAD_BR.csv, PAD_FR.csv : bandes courtes (100 cases), seulement pour l'animation des
+                       rouleaux côté front-end (config_fe) ; elles n'entrent pas dans les maths
 Les fichiers Python du jeu (game_config.py, gamestate.py…) sont recopiés depuis le
 modèle games/0_0_globe s'ils n'existent pas encore.
 """
@@ -115,6 +117,7 @@ def main():
     ap.add_argument("--game-id", default="0_0_globe", help="dossier/ID du jeu (ex. 12_3_monjeu)")
     ap.add_argument("--nom", default="Globe Multipliers", help="nom de travail du jeu")
     ap.add_argument("--provider", type=int, default=0, help="numéro de provider Stake Engine")
+    ap.add_argument("--studio", default="mon_studio", help="nom du studio (provider) Stake Engine")
     ap.add_argument("--seed", type=int, default=2024, help="graine pour mélanger les bandes")
     a = ap.parse_args()
 
@@ -167,6 +170,10 @@ def main():
     ecrire_bandes(dossier / "reels" / "BR0.csv", br)
     ecrire_bandes(dossier / "reels" / "FR0.csv", fr)
     ecrire_bandes(dossier / "reels" / "FRWCAP.csv", wc)
+    # Bandes d'affichage (tirées après les autres pour ne pas changer les bandes de maths)
+    for nom, poids in (("PAD_BR.csv", p["poids_base"]), ("PAD_FR.csv", p["poids_fs"])):
+        ecrire_bandes(dossier / "reels" / nom,
+                      [bande(poids[:, r], codes, 100, rows, scatter, rng) for r in range(5)])
 
     # Probabilités naturelles de 3/4/5 symboles bonus : servent à forcer le bonus avec les bonnes proportions
     dist = proba_bonus(br, scatter, rows)
@@ -206,6 +213,7 @@ def main():
                  "modifie la feuille puis relance l'export.",
         "game_id": a.game_id,
         "provider_number": a.provider,
+        "provider_name": a.studio,
         "working_name": a.nom,
         "rtp": rtp,
         "wincap": p["max_win"],

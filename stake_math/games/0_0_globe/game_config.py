@@ -34,6 +34,8 @@ class GameConfig(Config):
         self.game_id = p["game_id"]
         self.provider_number = p["provider_number"]
         self.working_name = p["working_name"]
+        self.game_name = p["working_name"]
+        self.provider_name = p.get("provider_name", "mon_studio")
         self.wincap = float(p["wincap"])
         self.win_type = p["win_type"]  # "cluster", "lines" ou "ways"
         self.cascades = bool(p.get("cascades", False))
@@ -95,8 +97,13 @@ class GameConfig(Config):
         self.reels = {}
         for r, f in reels.items():
             self.reels[r] = self.read_reels_csv(os.path.join(self.reels_path, f))
-        self.padding_reels[self.basegame_type] = self.reels["BR0"]
-        self.padding_reels[self.freegame_type] = self.reels["FR0"]
+        # Bandes courtes pour l'animation des rouleaux côté front-end (config_fe uniquement)
+        pad = {g: os.path.join(self.reels_path, f) for g, f in
+               ((self.basegame_type, "PAD_BR.csv"), (self.freegame_type, "PAD_FR.csv"))}
+        self.padding_reels[self.basegame_type] = (
+            self.read_reels_csv(pad[self.basegame_type]) if os.path.exists(pad[self.basegame_type]) else self.reels["BR0"])
+        self.padding_reels[self.freegame_type] = (
+            self.read_reels_csv(pad[self.freegame_type]) if os.path.exists(pad[self.freegame_type]) else self.reels["FR0"])
         self.padding_symbol_values = {self.globe_symbol: {"multiplier": {self.globe_multiplier: 1}}}
 
         mult = {g: {_num(k): w for k, w in d.items()} for g, d in p["mult_values"].items()}
