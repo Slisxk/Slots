@@ -4,7 +4,7 @@
   "provider_number": 0,
   "working_name": "Globe Multipliers",
   "rtp": 0.96,
-  "wincap": 5000.0,
+  "wincap": 10000.0,
   "win_type": "cluster",
   "multi_mode": "WILD_ADD",
   "num_rows": 5,
@@ -941,9 +941,9 @@
   },
   "targets": {
     "wincap_rtp": 0.001,
-    "freegame_rtp": 0.3652,
+    "freegame_rtp": 0.3655,
     "freegame_hr": 152.79,
-    "basegame_rtp": 0.5938,
+    "basegame_rtp": 0.5935,
     "basegame_hr": 3.327
   }
 }

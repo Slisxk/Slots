@@ -2,6 +2,7 @@
 
     python games/<game_id>/run.py            (depuis la racine du math-sdk)
     python games/<game_id>/run.py --test     (petit essai rapide, sans optimisation)
+    python games/<game_id>/run.py --books 200000   (nombre de résultats par mode, 100 000 par défaut)
 """
 
 import os
@@ -18,6 +19,7 @@ from src.write_data.write_configs import generate_configs
 
 if __name__ == "__main__":
     test = "--test" in sys.argv
+    books = int(sys.argv[sys.argv.index("--books") + 1]) if "--books" in sys.argv else int(1e5)
 
     num_threads = max(1, min(10, os.cpu_count() or 1))
     rust_threads = max(1, (os.cpu_count() or 1) * 2)
@@ -27,8 +29,8 @@ if __name__ == "__main__":
 
     # Nombre de résultats (books) par mode. Pour la publication, monte à 1e5 ou plus.
     num_sim_args = {
-        "base": int(2e3) if test else int(1e5),
-        "bonus": int(2e3) if test else int(1e5),
+        "base": int(2e3) if test else books,
+        "bonus": int(2e3) if test else books,
     }
 
     run_conditions = {
