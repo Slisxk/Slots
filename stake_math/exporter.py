@@ -2,7 +2,7 @@
 """
 Exporte la feuille de calcul vers un jeu prêt pour le math SDK de Stake Engine.
 
-    python exporter.py ../wild_side_school/wild_side_school_math.xlsx
+    python exporter.py ../modele_maths/modele_maths.xlsx
     python exporter.py ma_feuille.xlsx --game-id 12_3_monjeu --nom "Mon Jeu"
 
 Écrit dans games/<game-id>/ :
@@ -22,13 +22,13 @@ import sys
 from pathlib import Path
 
 ICI = Path(__file__).resolve().parent
-sys.path.insert(0, str(ICI.parent / "wild_side_school"))
+sys.path.insert(0, str(ICI.parent / "modele_maths"))
 import simulateur  # noqa: E402  (lecture des plages nommées du classeur)
 
 MODELE = ICI / "games" / "0_0_globe"
 FICHIERS_JEU = ["game_config.py", "game_calculations.py", "game_executables.py", "game_override.py",
                 "game_events.py", "gamestate.py", "game_optimization.py", "run.py", "readme.txt"]
-COMBOS_SDK = {("LINES", "WILD_ADD"), ("LINES", "GLOBAL_SUM"), ("WAYS", "WILD_MULT"), ("WAYS", "GLOBAL_SUM")}
+COMBOS_SDK = {("CLUSTER", "WILD_ADD"), ("CLUSTER", "GLOBAL_SUM"), ("LINES", "WILD_ADD"), ("LINES", "GLOBAL_SUM"), ("WAYS", "WILD_MULT"), ("WAYS", "GLOBAL_SUM")}
 RESERVES = {"W", "MX"}
 WINCAP_BOOST_GLOBE = 10   # globes x10 sur la bande FRWCAP
 
@@ -67,7 +67,7 @@ def comptes(poids, L):
 
 def bande(poids, codes, L, ecart_scatter, scatter, rng):
     """Construit une bande de L cases, chaque symbole en proportion de son poids.
-    Les trophées sont espacés d'au moins `ecart_scatter` cases (au plus 1 trophée visible
+    Les symboles bonus sont espacés d'au moins `ecart_scatter` cases (au plus 1 symbole bonus visible
     par rouleau), comme l'exige force_special_board du SDK."""
     n = dict(zip(codes, comptes(list(poids), L)))
     nb_sc = n.pop(scatter, 0)
@@ -75,9 +75,9 @@ def bande(poids, codes, L, ecart_scatter, scatter, rng):
     rng.shuffle(reste)
     L = len(reste) + nb_sc
     if nb_sc and L < nb_sc * ecart_scatter:
-        erreur(f"trop de trophées ({nb_sc}) pour une bande de {L} cases : il faut au moins "
-               f"{ecart_scatter} cases par trophée.")
-    # Répartit les trophées avec un écart >= ecart_scatter (bande circulaire)
+        erreur(f"trop de symboles bonus ({nb_sc}) pour une bande de {L} cases : il faut au moins "
+               f"{ecart_scatter} cases par symbole bonus.")
+    # Répartit les symboles bonus avec un écart >= ecart_scatter (bande circulaire)
     libre = L - nb_sc * ecart_scatter
     coupes = sorted(rng.randint(0, libre) for _ in range(nb_sc))
     pos = [c + i * ecart_scatter for i, c in enumerate(coupes)]
@@ -96,8 +96,8 @@ def ecrire_bandes(path, bandes):
             f.write(",".join(b[i] for b in bandes) + "\n")
 
 
-def proba_trophees(bandes, scatter, rows):
-    """Loi exacte du nombre de trophées visibles (au plus 1 par rouleau)."""
+def proba_bonus(bandes, scatter, rows):
+    """Loi exacte du nombre de symboles bonus visibles (au plus 1 par rouleau)."""
     dist = [1.0]
     for b in bandes:
         q = rows * b.count(scatter) / len(b)
@@ -138,9 +138,9 @@ def main():
     if min(table) != p["scatter_min"]:
         erreur("SCATTER_MIN doit être égal au premier seuil de la table des FS.")
     if max(table) > 5:
-        erreur("au plus 1 trophée par rouleau dans le SDK : la table des FS ne peut pas dépasser 5 trophées.")
-    if p["fs_par_trophee"] != int(p["fs_par_trophee"]) or p["fs_par_trophee"] < 1:
-        erreur("FS_PAR_TROPHEE doit être un entier >= 1.")
+        erreur("au plus 1 symbole bonus par rouleau dans le SDK : la table des FS ne peut pas dépasser 5 symboles bonus.")
+    if p["fs_par_bonus"] != int(p["fs_par_bonus"]) or p["fs_par_bonus"] < 1:
+        erreur("FS_PAR_BONUS doit être un entier >= 1.")
     for nom in ("poids_base", "poids_fs"):
         w = p[nom]
         if (abs(w - w.round()) > 1e-9).any():
@@ -168,8 +168,8 @@ def main():
     ecrire_bandes(dossier / "reels" / "FR0.csv", fr)
     ecrire_bandes(dossier / "reels" / "FRWCAP.csv", wc)
 
-    # Probabilités naturelles de 3/4/5 trophées : servent à forcer le bonus avec les bonnes proportions
-    dist = proba_trophees(br, scatter, rows)
+    # Probabilités naturelles de 3/4/5 symboles bonus : servent à forcer le bonus avec les bonnes proportions
+    dist = proba_bonus(br, scatter, rows)
     seuils = sorted(table)
     trig = {}
     for i, s in enumerate(seuils):
@@ -186,6 +186,21 @@ def main():
                         for v, w in zip(p["multi_val"], poids) if w > 0}
     wcap_mult = p["multi_w_fs"] * p["multi_val"]          # multis plus forts pour les résultats max win
 
+    if gain == "CLUSTER":
+        # Une entrée par taille de cluster (kind = taille), comme convert_range_table du SDK
+        n_cases = rows * 5
+        paytable = []
+        for c in pay_codes:
+            i = codes.index(c)
+            for j, t in enumerate(p["tailles"]):
+                fin = p["tailles"][j + 1] - 1 if j + 1 < len(p["tailles"]) else n_cases
+                for k in range(t, min(fin, n_cases) + 1):
+                    if p["pays_cluster"][i][j] > 0:
+                        paytable.append({"symbol": c, "kind": k, "pay": float(p["pays_cluster"][i][j])})
+    else:
+        paytable = [{"symbol": c, "kind": k, "pay": float(p["pays"][codes.index(c)][k - 3])}
+                    for c in pay_codes for k in (3, 4, 5) if p["pays"][codes.index(c)][k - 3] > 0]
+
     params = {
         "_info": "Généré par exporter.py depuis la feuille de calcul. Ne pas éditer à la main : "
                  "modifie la feuille puis relance l'export.",
@@ -198,15 +213,15 @@ def main():
         "multi_mode": mode,
         "num_rows": rows,
         "num_reels": 5,
-        "paytable": [{"symbol": c, "kind": k, "pay": float(p["pays"][codes.index(c)][k - 3])}
-                     for c in pay_codes for k in (3, 4, 5) if p["pays"][codes.index(c)][k - 3] > 0],
+        "paytable": paytable,
+        "cascades": bool(p["cascades"]) if gain == "CLUSTER" else False,
         "top_symbol": pay_codes[0],
         "scatter": scatter,
         "globe": globe,
         "globe_multiplier": p["multi_globe"],
         "paylines": p["lignes"].tolist(),
         "fs_triggers_base": {str(k): v for k, v in table.items()},
-        "fs_per_scatter_in_fs": int(p["fs_par_trophee"]),
+        "fs_per_scatter_in_fs": int(p["fs_par_bonus"]),
         "scatter_trigger_weights": trig,
         "mult_values": {"basegame": mv(p["multi_w_base"]), "freegame": mv(p["multi_w_fs"]),
                         "wincap": mv(wcap_mult)},
@@ -223,8 +238,9 @@ def main():
         json.dump(params, f, ensure_ascii=False, indent=2)
 
     print(f"Jeu exporté dans {dossier}")
-    print(f"  mode {gain} + {mode}, {len(params['paylines']) if gain == 'LINES' else rows ** 5} "
-          f"{'lignes' if gain == 'LINES' else 'ways'}, max win {p['max_win']:g}x, RTP cible {rtp:.2%}")
+    detail = {"LINES": f"{len(params['paylines'])} lignes", "WAYS": f"{rows ** 5} ways",
+              "CLUSTER": f"clusters de {p['tailles'][0]}+, cascades {'oui' if params['cascades'] else 'non'}"}[gain]
+    print(f"  mode {gain} + {mode}, {detail}, max win {p['max_win']:g}x, RTP cible {rtp:.2%}")
     print(f"  bandes : base {len(br[0])} cases, FS {len(fr[0])} cases ; "
           f"bonus naturel 1 spin sur {1 / sum(dist[min(table):]):.0f}")
     print(f"  cibles : base {rtp_bg:.4f} (hr {params['targets']['basegame_hr']}), "

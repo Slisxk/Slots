@@ -12,8 +12,7 @@ class GameState(GameStateOverride):
         while self.repeat:
             self.reset_book()
             self.draw_board(emit_event=True)
-            self.apply_globes()
-            self.evaluate_board()
+            self.play_board()
 
             self.win_manager.update_gametype_wins(self.gametype)
             if self.check_fs_condition() and self.check_freespin_entry():
@@ -28,10 +27,9 @@ class GameState(GameStateOverride):
         while self.fs < self.tot_fs and not self.wincap_triggered:
             self.update_freespin()
             self.draw_board(emit_event=True)
-            self.apply_globes()
-            self.evaluate_board()
+            self.play_board()
 
-            # Chaque trophée ajoute des FS (table freegame de game_config.py)
+            # Chaque symbole bonus encore sur la grille ajoute des FS (table freegame de game_config.py)
             if self.check_fs_condition():
                 self.update_fs_retrigger_amt()
 

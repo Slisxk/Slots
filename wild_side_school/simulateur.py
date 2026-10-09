@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 """
-Simulateur Monte Carlo pour le modèle « Wild Side School » (grille 5 rouleaux,
+Simulateur Monte Carlo pour le modèle de maths (grille 5 rouleaux,
 gains en lignes ou en ways, globe qui fait apparaître des multiplicateurs autour de lui,
-free spins avec +1 FS par trophée).
+free spins avec +1 FS par symbole bonus).
 
 Il lit tous les paramètres dans le classeur Excel (plages nommées) et réécrit
 les résultats dans l'onglet « Simulation ».
 
-    python simulateur.py wild_side_school_math.xlsx
-    python simulateur.py wild_side_school_math.xlsx --spins 500000 --buy 20000
-    python simulateur.py wild_side_school_math.xlsx --no-write   # affiche seulement
+    python simulateur.py modele_maths.xlsx
+    python simulateur.py modele_maths.xlsx --spins 500000 --buy 20000
+    python simulateur.py modele_maths.xlsx --no-write   # affiche seulement
 """
 import argparse
 import datetime as dt
@@ -19,7 +19,8 @@ import numpy as np
 from openpyxl import load_workbook
 
 MODES = ("WILD_ADD", "WILD_MULT", "GLOBAL_SUM")
-MODES_GAIN = ("LINES", "WAYS")
+MODES_GAIN = ("CLUSTER", "LINES", "WAYS")
+MULTI = -2                       # code d'une case multiplicateur posée par le globe (mode CLUSTER)
 MAX_FS_PAR_SESSION = 2000          # garde-fou contre une boucle de retrigger infinie
 DIST_BORNES = [0, 1, 5, 20, 100, 1000]   # tranches de la distribution des gains (x mise)
 
@@ -61,12 +62,17 @@ def load_params(path):
     table_fs = [r for r in _name_range(wb, "TABLE_FS") if r[0] not in (None, "")]
     lignes = [[int(v) - 1 for v in r] for r in _name_range(wb, "LIGNES")
               if all(v not in (None, "") for v in r)]
+    tailles = [int(v) for v in _name_range(wb, "TAILLES_CLUSTER")[0] if v not in (None, "")]
+    pay_cl = [[float(v or 0) for v in r[:len(tailles)]] for r in _name_range(wb, "PAYTABLE_CLUSTER")[:n_sym]]
 
     p = {
         "codes": [r[0] for r in pay_rows],
         "noms": [r[1] for r in pay_rows],
         "types": [str(r[2]).strip().upper() for r in pay_rows],
         "pays": np.array([[float(v or 0) for v in r[3:6]] for r in pay_rows]),  # 3,4,5 OAK
+        "tailles": tailles,                               # taille mini de chaque groupe de la paytable cluster
+        "pays_cluster": np.array(pay_cl).reshape(n_sym, len(tailles)),
+        "cascades": str(_name_value(wb, "CASCADES")).strip().upper() in ("OUI", "YES", "TRUE", "1"),
         "poids_base": weights("POIDS_BASE"),
         "poids_fs": weights("POIDS_FS"),
         "multi_val": np.array([float(r[0]) for r in multis]),
@@ -81,7 +87,7 @@ def load_params(path):
         "mode": str(_name_value(wb, "MODE_MULTI")).strip().upper(),
         "multi_globe": float(_name_value(wb, "MULTI_GLOBE")),
         "scatter_min": int(_name_value(wb, "SCATTER_MIN")),
-        "fs_par_trophee": float(_name_value(wb, "FS_PAR_TROPHEE")),
+        "fs_par_bonus": float(_name_value(wb, "FS_PAR_BONUS")),
         "buy_cout": float(_name_value(wb, "BUY_COUT")),
         "buy_fs": int(_name_value(wb, "BUY_FS")),
         "sim_spins": int(_name_value(wb, "SIM_SPINS")),
@@ -102,6 +108,11 @@ def validate(p):
             sys.exit("Mode LINES : l'onglet Lignes ne contient aucune ligne complète.")
         if p["lignes"].min() < 0 or p["lignes"].max() >= p["rows"]:
             sys.exit(f"Onglet Lignes : les positions doivent aller de 1 à {p['rows']}.")
+    if p["mode_gain"] == "CLUSTER":
+        if p["mode"] == "WILD_MULT":
+            sys.exit("Mode CLUSTER : choisis WILD_ADD ou GLOBAL_SUM (WILD_MULT n'existe pas en cluster dans le SDK).")
+        if not p["tailles"] or p["tailles"] != sorted(set(p["tailles"])) or p["tailles"][0] < 1:
+            sys.exit("Paytable cluster : les tailles doivent être des entiers croissants >= 1.")
     if p["types"].count("SCATTER") != 1:
         sys.exit("La Paytable doit contenir exactement un symbole de type SCATTER.")
     if p["types"].count("GLOBE") > 1:
@@ -133,27 +144,34 @@ class Moteur:
             "base": p["poids_base"] / p["poids_base"].sum(axis=0),
             "fs": p["poids_fs"] / p["poids_fs"].sum(axis=0),
         }
-        # Au plus 1 trophée par rouleau (comme sur les bandes du SDK, où les trophées sont espacés) :
-        # le trophée est présent sur le rouleau avec la probabilité lignes x p, à une rangée au hasard ;
-        # les autres cases sont tirées parmi les symboles hors trophée. Chaque case garde sa
+        # Au plus 1 symbole bonus par rouleau (comme sur les bandes du SDK, où les symboles bonus sont espacés) :
+        # le symbole bonus est présent sur le rouleau avec la probabilité lignes x p, à une rangée au hasard ;
+        # les autres cases sont tirées parmi les symboles hors symbole bonus. Chaque case garde sa
         # probabilité de la feuille (poids / total).
         self.q_sc = {k: self.rows * v[self.sc] for k, v in self.prob.items()}
         for k, q in self.q_sc.items():
             if (q > 1).any():
-                sys.exit(f"Trop de trophées ({k}) : lignes x P(trophée) doit rester <= 1 sur chaque rouleau.")
+                sys.exit(f"Trop de symboles bonus ({k}) : lignes x P(symbole bonus) doit rester <= 1 sur chaque rouleau.")
         sans_sc = {}
         for k, v in self.prob.items():
             v = v.copy()
             v[self.sc] = 0
             sans_sc[k] = v / v.sum(axis=0)
         self.cum = {k: np.cumsum(v, axis=0) for k, v in sans_sc.items()}
+        self.cum_complet = {k: np.cumsum(v, axis=0) for k, v in self.prob.items()}   # recharges des cascades
+        # Gain d'un cluster selon sa taille (0 .. lignes x rouleaux), par symbole
+        n_cases = self.rows * self.reels
+        self.pay_taille = np.zeros((len(p["codes"]), n_cases + 1))
+        for j, t in enumerate(p["tailles"]):
+            fin = p["tailles"][j + 1] if j + 1 < len(p["tailles"]) else n_cases + 1
+            self.pay_taille[:, min(t, n_cases + 1):min(fin, n_cases + 1)] = p["pays_cluster"][:, j][:, None]
         self.mprob = {
             "base": p["multi_w_base"] / p["multi_w_base"].sum(),
             "fs": p["multi_w_fs"] / p["multi_w_fs"].sum(),
         }
 
     def _tirage(self, n, phase):
-        """Grille (n, lignes, rouleaux) d'indices de symboles, au plus 1 trophée par rouleau."""
+        """Grille (n, lignes, rouleaux) d'indices de symboles, au plus 1 symbole bonus par rouleau."""
         u = self.rng.random((n, self.rows, self.reels))
         cum = self.cum[phase]
         grid = np.empty(u.shape, dtype=np.int16)
@@ -167,16 +185,18 @@ class Moteur:
         return grid
 
     def spin(self, n, phase):
-        """Joue n spins. Renvoie (gain x mise, nb trophées, a_un_globe, gains par symbole)."""
+        """Joue n spins. Renvoie (gain x mise, nb symboles bonus, a_un_globe, gains par symbole)."""
+        if self.p["mode_gain"] == "CLUSTER":
+            return self._spin_cluster(n, phase)
         grid = self._tirage(n, phase)
-        trophees = (grid == self.sc).sum(axis=(1, 2))
+        n_bonus = (grid == self.sc).sum(axis=(1, 2))
         globe, voisin, mult = self.transformer(grid, phase)
         g = self.evaluer(grid, globe | voisin, mult)        # (n, nb symboles)
-        return g.sum(axis=1), trophees, (globe | voisin).any(axis=(1, 2)), g.sum(axis=0)
+        return g.sum(axis=1), n_bonus, (globe | voisin).any(axis=(1, 2)), g.sum(axis=0)
 
     def transformer(self, grid, phase):
         """Les 8 cases autour de chaque globe deviennent des multiplicateurs
-        (sauf trophées et autres globes, qui restent en place). Renvoie (globe, voisin, mult)."""
+        (sauf symboles bonus et autres globes, qui restent en place). Renvoie (globe, voisin, mult)."""
         p = self.p
         if self.gl >= 0:
             globe = grid == self.gl
@@ -307,11 +327,123 @@ class Moteur:
             out[:, s] = np.where(sym == s, gain, 0.0).sum(axis=1)
         return out
 
-    def fs_initiaux(self, nb_trophees):
+    # ----------------------------------------------------------------- clusters + cascades
+    def _spin_cluster(self, n, phase):
+        """Mode CLUSTER, mêmes règles que le math SDK (src/calculations/cluster.py + tumble.py) :
+        groupes de symboles identiques reliés horizontalement/verticalement, les wilds relient ;
+        multi d'un cluster = somme des multis qu'il contient (1 si aucun) ; les cases gagnantes
+        explosent et de nouveaux symboles tombent (cascades) jusqu'à ce qu'il n'y ait plus de gain.
+        Les globes qui arrivent sur la grille (au départ ou en cascade) transforment leurs voisins."""
+        G = self._tirage(n, phase).astype(np.int16)
+        Mu = np.zeros(G.shape)
+        nouveau = np.ones(G.shape, dtype=bool)
+        par_sym = np.zeros((n, len(self.p["codes"])))
+        a_globe = np.zeros(n, dtype=bool)
+        idx = np.arange(n)
+        while True:
+            grid, mult, nv = G[idx], Mu[idx], nouveau[idx]
+            self._activer_globes(grid, mult, nv, phase)
+            a_globe[idx] |= ((grid == MULTI) | (grid == self.gl)).any(axis=(1, 2))
+            g, explose = self._clusters(grid, mult)
+            par_sym[idx] += g
+            G[idx], Mu[idx] = grid, mult
+            suite = explose.any(axis=(1, 2))
+            if not self.p["cascades"] or not suite.any():
+                break
+            idx = idx[suite]
+            grid, mult, nv = self._tomber(grid[suite], mult[suite], explose[suite], phase)
+            G[idx], Mu[idx], nouveau[idx] = grid, mult, nv
+        n_bonus = (G == self.sc).sum(axis=(1, 2))
+        return par_sym.sum(axis=1), n_bonus, a_globe, par_sym.sum(axis=0)
+
+    def _activer_globes(self, grid, mult, nouveau, phase):
+        """Les globes qui viennent d'arriver transforment leurs 8 voisins en multiplicateurs
+        (sauf symboles bonus, globes et cases déjà multiplicateur). Modifie grid et mult sur place."""
+        if self.gl < 0:
+            return
+        globe = (grid == self.gl) & nouveau
+        if not globe.any():
+            return
+        mult[globe] = self.p["multi_globe"]
+        pad = np.pad(globe, ((0, 0), (1, 1), (1, 1)))
+        voisin = np.zeros_like(globe)
+        for dr in (-1, 0, 1):
+            for dc in (-1, 0, 1):
+                if dr or dc:
+                    voisin |= pad[:, 1 + dr:1 + dr + self.rows, 1 + dc:1 + dc + self.reels]
+        voisin &= (grid != self.sc) & (grid != self.gl) & (grid != MULTI)
+        nv = int(voisin.sum())
+        if nv:
+            grid[voisin] = MULTI
+            mult[voisin] = self.rng.choice(self.p["multi_val"], size=nv, p=self.mprob[phase])
+
+    def _clusters(self, grid, mult):
+        """Gains par symbole (n, nb symboles) et cases qui explosent (n, lignes, rouleaux)."""
+        p = self.p
+        n = grid.shape[0]
+        nc = self.rows * self.reels
+        if p["mode"] == "GLOBAL_SUM":
+            wild = np.zeros(grid.shape, dtype=bool)
+        else:
+            wild = (grid == MULTI) | (grid == self.gl)
+        base = np.arange(n * nc).reshape(grid.shape)
+        GRAND = n * nc
+        out = np.zeros((n, len(p["codes"])))
+        explose = np.zeros(grid.shape, dtype=bool)
+        for s in self.pay_idx:
+            nat = grid == s
+            if not nat.any():
+                continue
+            M = nat | wild
+            lab = np.where(M, base, GRAND)
+            while True:                                    # composantes connexes (4 voisins)
+                nouv = lab.copy()
+                nouv[:, 1:, :] = np.minimum(nouv[:, 1:, :], lab[:, :-1, :])
+                nouv[:, :-1, :] = np.minimum(nouv[:, :-1, :], lab[:, 1:, :])
+                nouv[:, :, 1:] = np.minimum(nouv[:, :, 1:], lab[:, :, :-1])
+                nouv[:, :, :-1] = np.minimum(nouv[:, :, :-1], lab[:, :, 1:])
+                nouv = np.where(M, nouv, GRAND)
+                if np.array_equal(nouv, lab):
+                    break
+                lab = nouv
+            ids, inv = np.unique(lab[M], return_inverse=True)
+            taille = np.bincount(inv)
+            n_nat = np.bincount(inv, weights=nat[M])
+            somme_m = np.bincount(inv, weights=mult[M] * wild[M])
+            pay = self.pay_taille[s][taille]
+            valide = (n_nat > 0) & (pay > 0)
+            gain = pay * np.where(somme_m > 0, somme_m, 1.0) * valide
+            out[:, s] = np.bincount(ids // nc, weights=gain, minlength=n)
+            e = np.zeros(grid.shape, dtype=bool)
+            e[M] = valide[inv]
+            explose |= e
+        if p["mode"] == "GLOBAL_SUM":
+            bm = mult.sum(axis=(1, 2))
+            out *= np.where(bm > 0, bm, 1.0)[:, None]
+        return out, explose
+
+    def _tomber(self, grid, mult, explose, phase):
+        """Retire les cases gagnantes, fait tomber le reste, remplit le haut de chaque rouleau."""
+        cle = (~explose).astype(np.int8)                   # 0 = case retirée (remonte en haut)
+        ordre = np.argsort(cle, axis=1, kind="stable")
+        grid = np.take_along_axis(grid, ordre, axis=1)
+        mult = np.take_along_axis(mult, ordre, axis=1)
+        nouveau = np.take_along_axis(cle, ordre, axis=1) == 0
+        u = self.rng.random(grid.shape)
+        cum = self.cum_complet[phase]
+        tir = np.empty(grid.shape, dtype=np.int16)
+        for r in range(self.reels):
+            tir[:, :, r] = np.searchsorted(cum[:, r], u[:, :, r], side="right")
+        tir = np.minimum(tir, len(self.p["codes"]) - 1)
+        grid = np.where(nouveau, tir, grid)
+        mult = np.where(nouveau, 0.0, mult)
+        return grid, mult, nouveau
+
+    def fs_initiaux(self, nb_bonus):
         table = self.p["table_fs"]
-        out = np.zeros(len(nb_trophees), dtype=np.int64)
+        out = np.zeros(len(nb_bonus), dtype=np.int64)
         for seuil, fs in table:                 # table triée : le dernier seuil couvre « et plus »
-            out[nb_trophees >= seuil] = fs
+            out[nb_bonus >= seuil] = fs
         return out
 
     def sessions_fs(self, fs_init, plafond):
@@ -327,7 +459,7 @@ class Moteur:
             total[actifs] += g
             par_symbole += ps
             joues[actifs] += 1
-            restant[actifs] += tr * self.p["fs_par_trophee"] - 1
+            restant[actifs] += tr * self.p["fs_par_bonus"] - 1
             fini = (restant[actifs] < 1) | (total[actifs] >= plafond) | \
                    (joues[actifs] >= MAX_FS_PAR_SESSION)
             actifs = actifs[~fini]

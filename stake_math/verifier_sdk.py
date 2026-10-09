@@ -5,7 +5,7 @@ que le math SDK de Stake Engine (Lines.get_lines / Ways.get_ways_data + transfor
 
 À lancer avec le Python du math SDK, une fois le jeu copié dans <math-sdk>/games/ :
 
-    <math-sdk>/env/bin/python verifier_sdk.py <math-sdk> ../wild_side_school/wild_side_school_math.xlsx
+    <math-sdk>/env/bin/python verifier_sdk.py <math-sdk> ../modele_maths/modele_maths.xlsx
 
 Pour chaque combinaison de modes gérée par le SDK, des grilles aléatoires (avec beaucoup de globes)
 sont évaluées des deux côtés et comparées.
@@ -16,7 +16,8 @@ import sys
 import numpy as np
 
 ICI = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, os.path.join(ICI, "..", "wild_side_school"))
+sys.path.insert(0, os.path.join(ICI, "..", "modele_maths"))
+sys.path.insert(0, ICI)
 
 
 def main():
@@ -32,27 +33,37 @@ def main():
     import simulateur
     from game_config import GameConfig, PARAMS
     from gamestate import GameState
+    from src.calculations.cluster import Cluster
     from src.calculations.lines import Lines
     from src.calculations.ways import Ways
 
     p = simulateur.load_params(classeur)
-    p["poids_base"][p["types"].index("GLOBE")] = p["poids_base"].sum(axis=0) / 25  # ~1 globe par grille
+    p["poids_base"][p["types"].index("GLOBE")] = np.round(p["poids_base"].sum(axis=0) / 25)  # ~1 globe/grille
     config = GameConfig()
     top = PARAMS["top_symbol"]
-    pays = {(e["kind"], e["symbol"]): e["pay"] for e in PARAMS["paytable"]}
     ok = True
 
-    for gain, mode in [("LINES", "WILD_ADD"), ("LINES", "GLOBAL_SUM"), ("WAYS", "WILD_MULT"), ("WAYS", "GLOBAL_SUM")]:
+    combos = [("CLUSTER", "WILD_ADD"), ("CLUSTER", "GLOBAL_SUM"), ("LINES", "WILD_ADD"),
+              ("LINES", "GLOBAL_SUM"), ("WAYS", "WILD_MULT"), ("WAYS", "GLOBAL_SUM")]
+    pays_lignes = {(k, c): float(p["pays"][i][k - 3]) for i, c in enumerate(p["codes"])
+                   for k in (3, 4, 5) if p["types"][i] == "PAY" and p["pays"][i][k - 3] > 0}
+    for gain, mode in combos:
         # Reconfigure le jeu SDK pour cette combinaison
         config.win_type = gain.lower()
+        config.paylines = {i + 1: line for i, line in enumerate(p["lignes"].tolist())}
         config.multi_mode = mode
         config.wild_multis = mode != "GLOBAL_SUM"
         config.mult_symbol = "W" if config.wild_multis else "MX"
-        config.paytable = dict(pays)
+        if gain == "CLUSTER":
+            m0 = simulateur.Moteur(p, np.random.default_rng(0))
+            config.paytable = {(k, c): float(m0.pay_taille[i][k]) for i, c in enumerate(p["codes"])
+                               for k in range(1, m0.pay_taille.shape[1]) if m0.pay_taille[i][k] > 0}
+        else:
+            config.paytable = dict(pays_lignes)
         if gain == "LINES" and config.wild_multis:
             for k in (3, 4, 5):
-                if (k, top) in pays:
-                    config.paytable[(k, "W")] = pays[(k, top)]
+                if (k, top) in pays_lignes:
+                    config.paytable[(k, "W")] = pays_lignes[(k, top)]
         config.special_symbols = {
             "wild": ["W", config.globe_symbol] if config.wild_multis else [],
             "scatter": [config.scatter_symbol],
@@ -64,8 +75,17 @@ def main():
         p["mode_gain"], p["mode"] = gain, mode
         m = simulateur.Moteur(p, np.random.default_rng(7))
         grid = m._tirage(n_grilles, "base")
-        globe, voisin, mult = m.transformer(grid, "base")
-        notre = m.evaluer(grid, globe | voisin, mult).sum(axis=1)
+        if gain == "CLUSTER":
+            grid = grid.astype(np.int16)
+            mult = np.zeros(grid.shape)
+            m._activer_globes(grid, mult, np.ones(grid.shape, dtype=bool), "base")
+            voisin = grid == simulateur.MULTI
+            globe = grid == m.gl
+            gains, explose = m._clusters(grid, mult)
+            notre = gains.sum(axis=1)
+        else:
+            globe, voisin, mult = m.transformer(grid, "base")
+            notre = m.evaluer(grid, globe | voisin, mult).sum(axis=1)
 
         ecarts = 0
         for i in range(n_grilles):
@@ -83,21 +103,95 @@ def main():
                 strat, gm = "symbol", 1
             else:
                 strat, gm = "global", gs.board_multiplier()
-            if gain == "LINES":
+            if gain == "CLUSTER":
+                data = Cluster.get_cluster_data(config, board, global_multiplier=gm)
+                sdk_win = data["totalWin"]
+                sdk_exp = {(q["reel"], q["row"]) for w in data["wins"] for q in w["positions"]}
+                nos_exp = {(c, r) for r in range(p["rows"]) for c in range(5) if explose[i, r, c]}
+                if sdk_exp != nos_exp:
+                    sdk_win = float("nan")   # compté comme écart : cases gagnantes différentes
+            elif gain == "LINES":
                 sdk_win = Lines.get_lines(board, config, multiplier_method=strat, global_multiplier=gm)["totalWin"]
             else:
                 sdk_win = Ways.get_ways_data(config, board, global_multiplier=gm,
                                              multiplier_strategy=strat)["totalWin"]
-            if abs(sdk_win - notre[i]) > 0.011 * max(1, len(config.paylines)):
+            if not abs(sdk_win - notre[i]) <= 0.011 * 25:
                 ecarts += 1
                 if ecarts <= 3:
                     print(f"  écart grille {i}: SDK {sdk_win} / feuille {notre[i]:.4f}")
         avec_globe = int((globe | voisin).any(axis=(1, 2)).sum())
         etat = "OK" if ecarts == 0 else f"{ecarts} ÉCARTS"
         ok &= ecarts == 0
-        print(f"{gain:5} + {mode:10} : {n_grilles} grilles ({avec_globe} avec globe), "
+        print(f"{gain:7} + {mode:10} : {n_grilles} grilles ({avec_globe} avec globe), "
               f"gain total SDK = feuille -> {etat}")
+    ok &= verifier_cascades(p, config, simulateur, GameState, n_grilles)
     sys.exit(0 if ok else 1)
+
+
+def verifier_cascades(p, config, simulateur, GameState, n_grilles):
+    """Cascades : compare statistiquement le SDK (bandes de rouleaux, tumble_board) et la feuille
+    (tirage case par case) sur des spins de base complets, globes fréquents, sans free spins."""
+    import exporter
+    import random
+    if not p["cascades"]:
+        return True
+    p["mode_gain"] = "CLUSTER"
+    ok = True
+    n_sdk = max(4000, n_grilles * 3)
+    # Globe sur ~1 grille sur 4 : assez pour tester les cascades avec multis, sans saturer le max win
+    poids_test = p["poids_base"].copy()
+    poids_test[p["types"].index("GLOBE")] = np.round(poids_test.sum(axis=0) / 100)
+    for mode in ("WILD_ADD", "GLOBAL_SUM"):
+        p["mode"] = mode
+        config.win_type, config.multi_mode = "cluster", mode
+        config.wild_multis = mode != "GLOBAL_SUM"
+        config.mult_symbol = "W" if config.wild_multis else "MX"
+        config.special_symbols = {
+            "wild": ["W", config.globe_symbol] if config.wild_multis else [],
+            "scatter": [config.scatter_symbol],
+            "multiplier": [config.mult_symbol, config.globe_symbol],
+            "globe": [config.globe_symbol],
+        }
+        m0 = simulateur.Moteur(p, np.random.default_rng(0))
+        config.paytable = {(k, c): float(m0.pay_taille[i][k]) for i, c in enumerate(p["codes"])
+                           for k in range(1, m0.pay_taille.shape[1]) if m0.pay_taille[i][k] > 0}
+        # Mêmes poids des deux côtés : bandes construites depuis la feuille (globes fréquents)
+        rng = random.Random(1)
+        p["poids_base"] = poids_test.copy()
+        L = int(p["poids_base"].sum(axis=0).max())
+        sc = p["codes"][p["types"].index("SCATTER")]
+        config.reels["TEST"] = [exporter.bande(p["poids_base"][:, r], p["codes"], L, p["rows"], sc, rng)
+                                for r in range(5)]
+        gs = GameState(config)
+        gs.betmode, gs.criteria = "base", "basegame"
+        conds = gs.get_current_distribution_conditions()
+        conds_save = (dict(conds["reel_weights"]), conds.get("mult_values"))
+        conds["reel_weights"] = {config.basegame_type: {"TEST": 1}}
+        mprob = {float(v): w for v, w in zip(p["multi_val"], p["multi_w_base"])}
+        conds["mult_values"] = {config.basegame_type: mprob, config.freegame_type: mprob}
+        wins = []
+        for i in range(n_sdk):
+            gs.reset_seed(i)
+            gs.reset_book()
+            gs.create_board_reelstrips()
+            gs.play_board()
+            wins.append(gs.win_manager.spin_win)
+        conds["reel_weights"], conds["mult_values"] = conds_save
+        cap = config.wincap               # le SDK arrête les cascades au max win
+        wins = np.minimum(np.array(wins), cap)
+
+        m = simulateur.Moteur(p, np.random.default_rng(11))
+        notre = np.minimum(m.spin(200_000, "base")[0], cap)
+        diff = wins.mean() - notre.mean()
+        err = np.sqrt(wins.var() / len(wins) + notre.var() / len(notre))
+        hit_sdk, hit_nous = (wins > 0).mean(), (notre > 0).mean()
+        err_hit = np.sqrt(hit_nous * (1 - hit_nous) / len(wins))
+        bon = abs(diff) <= 3 * err and abs(hit_sdk - hit_nous) <= 3 * err_hit
+        ok &= bon
+        print(f"CASCADES {mode:10} : gain moyen SDK {wins.mean():.4f} / feuille {notre.mean():.4f} "
+              f"(écart {diff / err:+.1f} σ) ; spins gagnants {hit_sdk:.2%} / {hit_nous:.2%} -> "
+              f"{'OK' if bon else 'ÉCART'}")
+    return ok
 
 
 if __name__ == "__main__":

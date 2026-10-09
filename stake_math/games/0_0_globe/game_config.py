@@ -18,7 +18,8 @@ def _num(k):
 
 
 class GameConfig(Config):
-    """Grille 5 x 5, globe qui transforme ses 8 voisins en multiplicateurs, free spins à retrigger."""
+    """Grille 5 x 5 (clusters + cascades, ou lignes / ways), globe qui transforme ses 8 voisins
+    en multiplicateurs, free spins avec +N FS par symbole bonus."""
 
     _instance = None
 
@@ -34,7 +35,8 @@ class GameConfig(Config):
         self.provider_number = p["provider_number"]
         self.working_name = p["working_name"]
         self.wincap = float(p["wincap"])
-        self.win_type = p["win_type"]  # "lines" ou "ways"
+        self.win_type = p["win_type"]  # "cluster", "lines" ou "ways"
+        self.cascades = bool(p.get("cascades", False))
         self.rtp = p["rtp"]
         self.construct_paths()
 
@@ -58,7 +60,8 @@ class GameConfig(Config):
                 if (k, p["top_symbol"]) in self.paytable:
                     self.paytable[(k, "W")] = self.paytable[(k, p["top_symbol"])]
 
-        self.paylines = {i + 1: line for i, line in enumerate(p["paylines"])}
+        if self.win_type == "lines":
+            self.paylines = {i + 1: line for i, line in enumerate(p["paylines"])}
         self.include_padding = True
 
         wilds = ["W", self.globe_symbol] if self.wild_multis else []
@@ -70,10 +73,15 @@ class GameConfig(Config):
         }
 
         fs_k = p["fs_per_scatter_in_fs"]
+        n_cases = self.num_reels * p["num_rows"]
+        seuils = sorted((int(k), int(v)) for k, v in p["fs_triggers_base"].items())
+        base_table = {}
+        for n in range(seuils[0][0], n_cases + 1):   # le dernier seuil vaut « et plus » (cascades)
+            base_table[n] = [v for k, v in seuils if k <= n][-1]
         self.freespin_triggers = {
-            self.basegame_type: {int(k): int(v) for k, v in p["fs_triggers_base"].items()},
-            # Pendant les FS : chaque trophée ajoute fs_k free spins
-            self.freegame_type: {n: n * fs_k for n in range(1, self.num_reels + 1)},
+            self.basegame_type: base_table,
+            # Pendant les FS : chaque symbole bonus ajoute fs_k free spins
+            self.freegame_type: {n: n * fs_k for n in range(1, n_cases + 1)},
         }
         self.anticipation_triggers = {
             self.basegame_type: min(self.freespin_triggers[self.basegame_type].keys()) - 1,
@@ -118,7 +126,7 @@ class GameConfig(Config):
             "force_wincap": True,
             "force_freegame": True,
         }
-        # Bonus buy : on force le nombre minimum de trophées, le nombre de FS vient de buy.spins
+        # Bonus buy : on force le nombre minimum de symboles bonus, le nombre de FS vient de buy.spins
         buy_condition = dict(freegame_condition, scatter_triggers={min_scatter: 1})
         buy_wincap_condition = dict(wincap_condition, scatter_triggers={min_scatter: 1})
 

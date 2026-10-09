@@ -1,59 +1,51 @@
-# Wild Side School : modèle de maths réutilisable
+# Modèle de maths : grille 5x5, clusters, globe à multiplicateurs, free spins
 
-Ce dossier sert de base pour une slot au même board que *Wild Side School* (Oddspark Studios) :
+Base de calcul pour une slot. Les symboles sont génériques : tu fais ta propre direction artistique par-dessus, les maths ne changent pas.
 
-- grille 5 × 5 ;
-- symbole **Globe** : les 8 cases autour de lui deviennent des multiplicateurs ;
-- **free spins** déclenchés par les **Trophées**, avec +1 FS par trophée pendant les FS ;
-- **bonus buy**.
+**Le principe**
+- **Grille** : 5 rouleaux × 5 lignes.
+- **Clusters** : au moins 5 symboles identiques reliés horizontalement ou verticalement. Le gain dépend de la taille du cluster.
+- **Cascades** : les clusters gagnants explosent, les symboles tombent et de nouveaux arrivent, jusqu'à ce qu'il n'y ait plus de gain.
+- **Globe** : quand il arrive sur la grille, au départ ou pendant une cascade, ses 8 voisins deviennent des **wilds multiplicateurs**. Le multi d'un cluster est la somme des multis qu'il contient.
+- **Free spins** : déclenchés par 3, 4 ou 5 symboles bonus. Pendant les FS, chaque symbole bonus donne **+1 FS**.
+- **Bonus buy**.
 
 | Fichier | Rôle |
 |---|---|
-| `wild_side_school_math.xlsx` | Le classeur : paramètres, paytable, poids, multis, calculs analytiques en direct et résumé du RTP. |
+| `modele_maths.xlsx` | Le classeur : paramètres, paytables, poids, multis, fréquence du bonus en direct, résultats de simulation et résumé du RTP. |
 | `simulateur.py` | Le simulateur Monte Carlo. Il lit le classeur, joue des millions de spins et écrit les résultats dans l'onglet **Simulation**. |
+| `../stake_math/` | L'export vers le math SDK officiel de Stake Engine, et la génération des fichiers à publier. |
 
 ## Utilisation
 
-1. Ouvre le classeur. Modifie seulement les cellules **bleues sur fond jaune** dans *Config*, *Paytable*, *Lignes*, *Poids* et *Multis*.
-2. *Calc_Gains* et *Calc_Bonus* se mettent à jour tout seuls. Ils donnent :
-   - le RTP exact des lignes ou des ways hors globe ;
-   - la fréquence du bonus ;
-   - le nombre moyen de FS avec retrigger ;
-   - la fréquence du globe.
-3. Enregistre le classeur, puis lance la simulation (Python 3 avec `numpy` et `openpyxl`) :
+1. Ouvre le classeur. Modifie seulement les cellules **bleues sur fond jaune** dans *Config*, *Paytable* (table du bas, pour les clusters), *Poids* et *Multis*.
+2. Enregistre, puis lance la simulation (Python 3 avec `numpy` et `openpyxl`) :
 
    ```bash
    pip install numpy openpyxl
-   python simulateur.py wild_side_school_math.xlsx
+   python simulateur.py modele_maths.xlsx
    # plus rapide pour tester : --spins 300000 --buy 10000 ; afficher sans écrire : --no-write
    ```
 
-   Ferme le fichier dans Excel avant de lancer la simulation, car le script le réécrit.
-4. L'onglet *Résumé* compare le RTP simulé au RTP cible. Il affiche aussi le prix conseillé du bonus buy.
+   Ferme le fichier dans Excel avant de lancer, car le script le réécrit. Le jeu est très volatil à cause du globe : pour un RTP précis à ±1 %, compte 5 millions de spins (`--spins 5000000`, environ 10 minutes).
+3. L'onglet *Résumé* compare le RTP simulé au RTP cible, et donne le prix conseillé du bonus buy.
+4. Quand c'est « OK », exporte vers Stake Engine (voir `../stake_math/README.md`).
 
-Pour une autre slot : renomme les symboles, change les gains et les poids, puis relance le simulateur jusqu'à avoir « OK » dans le *Résumé*.
+## Règles (réglables dans *Config*)
 
-## Hypothèses (réglables dans *Config*)
+**Mode des multiplicateurs**
+- `WILD_ADD` (par défaut) : les multis et le globe sont des wilds. Ils relient les symboles d'un cluster.
+- `GLOBAL_SUM` : les multis ne sont pas des wilds, et la somme des multis à l'écran multiplie chaque gain.
 
-Les règles officielles du jeu n'étaient pas accessibles. Le modèle part donc des captures d'écran et ces points restent à vérifier :
-
-- **Mode de gain** : `LINES` (20 lignes par défaut, onglet *Lignes*) ou `WAYS` (3 125 ways).
-- **Mode des multiplicateurs** :
-  - `WILD_ADD` (par défaut) : les cases multi sont des wilds, et les multis d'une même ligne ou way s'additionnent ;
-  - `WILD_MULT` : les multis se multiplient ;
-  - `GLOBAL_SUM` : les multis ne sont pas des wilds, et leur somme multiplie le gain total du spin.
-- Les trophées et les globes ne sont pas recouverts par les multis.
-- En lignes, une ligne 100 % wild paie comme le premier symbole PAY (le Singe). En ways, une way doit commencer par un vrai symbole sur le rouleau 1 : une way 100 % wild ne paie pas (règle du SDK).
-- Chaque case suit les poids de son rouleau, avec au plus 1 trophée par rouleau visible, comme sur les bandes du SDK de Stake Engine.
-- Les multis ne restent pas d'un spin à l'autre.
-- En WILD_ADD, seuls les multis supérieurs à 1x s'additionnent : le globe 1x ne compte pas. C'est la règle du SDK.
-- La paytable, les poids et les multis sont des **valeurs de départ calées pour environ 96 %**. Ce ne sont pas les valeurs officielles du jeu.
-
-## Passer sur Stake Engine
-
-Le dossier [`../stake_math`](../stake_math/README.md) exporte cette feuille vers le math SDK officiel de Stake Engine et génère les fichiers à publier. Les règles du simulateur sont alignées sur celles du SDK : sur 20 000 grilles, les gains sont identiques pour les 4 combinaisons de modes.
+**Autres règles**
+- Cascades : `OUI` ou `NON`.
+- Les symboles bonus, les globes et les multis déjà posés ne sont pas recouverts.
+- Sur la grille de départ, il y a au plus 1 symbole bonus par rouleau, comme sur les bandes du SDK. Les cascades peuvent en ajouter.
+- Les modes `LINES` (onglet *Lignes*, paytable 3/4/5 ×) et `WAYS` restent disponibles. Leur paytable a été calée avec d'anciens poids : elle est donc à recaler si tu changes de mode.
+- Les valeurs fournies sont des **valeurs de départ calées pour environ 96 %**, à ajuster à ton goût.
 
 ## Vérifications faites
 
-- Avec le poids du globe à 0, le RTP simulé est égal au RTP analytique de *Calc_Gains*, en lignes comme en ways.
-- Sur 20 000 grilles aléatoires avec globes, le simulateur donne exactement les mêmes gains que le math SDK de Stake Engine, pour les 4 combinaisons de modes gérées par le SDK (`../stake_math/verifier_sdk.py`).
+Toutes les vérifications passent par `../stake_math/verifier_sdk.py` :
+- **Grilles identiques** : sur des grilles aléatoires avec globes, le simulateur donne exactement les mêmes gains et les mêmes cases gagnantes que le math SDK de Stake Engine, dans tous les modes (clusters, lignes, ways).
+- **Cascades** : le gain moyen et le taux de spins gagnants du simulateur et du SDK concordent statistiquement.
