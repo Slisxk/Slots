@@ -3,6 +3,8 @@
     python games/<game_id>/run.py            (depuis la racine du math-sdk)
     python games/<game_id>/run.py --test     (petit essai rapide, sans optimisation)
     python games/<game_id>/run.py --books 200000   (nombre de résultats par mode, 100 000 par défaut)
+    python games/<game_id>/run.py --optimiseur     (optimiseur Rust du SDK au lieu de la pondération
+                                                    naturelle ; il peut déformer la distribution des gains)
 """
 
 import os
@@ -10,7 +12,9 @@ import sys
 
 from gamestate import GameState
 from game_config import GameConfig
+from game_config import PARAMS
 from game_optimization import OptimizationSetup
+from ponderation import ponderer
 from optimization_program.run_script import OptimizationExecution
 from utils.game_analytics.run_analysis import create_stat_sheet
 from utils.rgs_verification import execute_all_tests
@@ -19,6 +23,7 @@ from src.write_data.write_configs import generate_configs
 
 if __name__ == "__main__":
     test = "--test" in sys.argv
+    optimiseur_sdk = "--optimiseur" in sys.argv
     books = int(sys.argv[sys.argv.index("--books") + 1]) if "--books" in sys.argv else int(1e5)
 
     num_threads = max(1, min(10, os.cpu_count() or 1))
@@ -52,7 +57,10 @@ if __name__ == "__main__":
     generate_configs(gamestate)
 
     if run_conditions["run_optimization"]:
-        OptimizationExecution().run_all_modes(config, target_modes, rust_threads)
+        if optimiseur_sdk:
+            OptimizationExecution().run_all_modes(config, target_modes, rust_threads)
+        else:
+            ponderer(config, PARAMS)   # garde la distribution naturelle des gains (voir ponderation.py)
         generate_configs(gamestate)
 
     if run_conditions["run_analysis"]:

@@ -24,7 +24,8 @@ stake_math/
     ├── gamestate.py       déroulé d'un tour (base + free spins)
     ├── game_executables.py  transformation autour du globe + calcul des gains
     ├── game_events.py     événement « globeMultipliers » pour le front-end
-    ├── game_optimization.py cibles de l'optimiseur
+    ├── ponderation.py     poids des résultats : distribution naturelle, RTP exact, limites « 3 étoiles »
+    ├── game_optimization.py cibles de l'optimiseur Rust (option --optimiseur)
     └── run.py             simulation, optimisation, stats et vérifications
 ```
 
@@ -36,7 +37,7 @@ stake_math/
    python exporter.py ../modele_maths/modele_maths.xlsx --game-id 0_0_globe --nom "Mon Jeu" --studio mon_studio
    ```
    Avec un autre `--game-id`, les fichiers Python sont recopiés dans `games/<game-id>/`.
-3. **Installer le math SDK** (Python 3.12+, et Rust/Cargo pour l'optimiseur), à la racine de ce repo, à côté de `stake_math/` :
+3. **Installer le math SDK** (Python 3.12+ ; Rust/Cargo seulement pour l'option `--optimiseur`), à la racine de ce repo, à côté de `stake_math/` :
    ```bash
    git clone https://github.com/StakeEngine/math-sdk.git && cd math-sdk && make setup
    env/bin/pip install openpyxl   # pour verifier_sdk.py
@@ -86,4 +87,9 @@ Les combinaisons gérées nativement par le SDK, à choisir dans la feuille :
   - Les poids deviennent des nombres d'occurrences sur la bande.
   - Les symboles bonus sont espacés pour qu'il y en ait au plus 1 par rouleau visible. Le bonus naturel est donc un peu plus rare que dans la feuille, et l'exportateur affiche sa vraie fréquence.
 - **Cascades** : dans le SDK, les nouveaux symboles viennent de la bande, au-dessus de la grille. Dans la feuille, ils sont tirés case par case avec les mêmes poids. `verifier_sdk.py` vérifie que les deux donnent statistiquement le même gain moyen et le même taux de spins gagnants.
-- **RTP final** : c'est l'optimiseur du SDK qui le fixe en pondérant les books. Il vise le RTP cible, avec la répartition base/FS et la fréquence du bonus mesurées par la feuille. Une feuille calée près de 96 % facilite son travail.
+- **RTP final** : `ponderation.py` pondère les books en gardant la distribution naturelle du jeu.
+  - Chaque catégorie de résultats garde sa probabilité réelle : fréquence du bonus mesurée par la feuille, max win à 0,1 % du RTP.
+  - Le RTP est ajusté exactement à la cible.
+  - Les gros gains (≥ 40× le coût du mode) ne sont réduits que si la limite « 3 étoiles » `etl40b` du SDK l'exige.
+
+  L'optimiseur Rust du SDK reste disponible (`run.py --optimiseur`), mais avec les réglages de l'exemple officiel il déformait fortement la distribution des gains. Une feuille calée près de 96 % garde les ajustements minimes.

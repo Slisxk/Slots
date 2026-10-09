@@ -21,8 +21,8 @@
 | Bonus buy | 59 × la mise → 10 free spins |
 | RTP | 96,00 % (mode base et mode bonus buy) |
 | Max win | **10 000 × la mise** |
-| Volatilité | Élevée (écart-type ≈ 8,8 × la mise par tour après optimisation) |
-| Fréquence de gain | 30,7 % des tours |
+| Volatilité | Élevée : écart-type de 25,7 × la mise par tour ; toutes les limites « 3 étoiles » du SDK sont respectées |
+| Fréquence de gain | 30,0 % des tours |
 | Fréquence du bonus | 1 tour sur 153 |
 
 *(Le détail est en section 8.)*
@@ -151,32 +151,48 @@ Le `board` des événements suivants contient déjà les `W` avec leur multiplic
 
 ## 8. Statistiques
 
-Elles sont calculées sur les fichiers publiés (40 000 résultats par mode, après l'optimiseur du math SDK). Pour la publication, il faudra relancer avec 100 000 résultats ou plus par mode.
+Elles sont calculées sur les fichiers publiés (40 000 résultats par mode), avec les fonctions de vérification du math SDK. Pour la publication, il faudra relancer avec 100 000 résultats ou plus par mode.
+
+**Comment les poids sont calculés.** Les poids des résultats viennent d'une **pondération naturelle** (`ponderation.py`), pas de l'optimiseur Rust du SDK : avec les réglages de l'exemple officiel, celui-ci déformait fortement la distribution des gains. La pondération naturelle garde les vraies probabilités du jeu. Elle n'ajuste que deux choses :
+- le RTP, pour qu'il tombe exactement sur 96,00 % ;
+- en bonus buy, les gains de 2 360× et plus, rendus environ 13 fois plus rares pour respecter la limite « 3 étoiles » `etl40b`.
 
 | | Mode `base` (1×) | Mode `bonus` (59×) |
 |---|---|---|
 | RTP | **96,00 %** | **96,00 %** |
-| Fréquence de gain | 30,7 % des tours | 100 % |
+| Fréquence de gain | 30,0 % des tours (1 sur 3,34) | 100 % |
 | Gain moyen | 0,96 × la mise | 56,6 × la mise |
-| Écart-type | 8,8 × la mise | 81,8 × la mise |
-| Max win (10 000×) | ≈ 1 tour sur 10 000 000 | ≈ 1 achat sur 170 000 |
+| Écart-type | 25,7 × la mise | 228 × la mise |
+| Max win (10 000×) | ≈ 1 tour sur 10 000 000 | ≈ 1 achat sur 92 000 |
+
+**Limites « 3 étoiles » du SDK** (`utils/rgs_verification.py`), toutes respectées :
+
+| Critère | Limite | Base | Bonus |
+|---|---|---|---|
+| `etl40b` (espérance des gains ≥ 40× le coût) | ≤ 0,9 | 0,594 | 0,800 |
+| `etl10k` (espérance des gains ≥ 10 000×) | ≤ 0,8 | 0,001 | 0,109 |
+| `cvar` (gain moyen des 0,1 % meilleurs tours, en × le coût) | ≤ 800 | 569 | 43,5 |
+| `prob5k` / `prob10k` | ≤ 1 % / 0,5 % | ≈ 0 | ≈ 0 |
+| RTP | ≤ 96,7 % | 96,00 % | 96,00 % |
 
 **Mode base, détail**
-- Free spins : 1 tour sur 153, environ 26 FS par bonus, 56× la mise en moyenne. Ils pèsent 36,6 % du RTP.
-- Jeu de base sans bonus : un gain tous les 3,3 tours, 2× la mise en moyenne. Il pèse 59,4 % du RTP.
+- Free spins : 1 tour sur 153, environ 26 FS par bonus, 56× la mise en moyenne. Ils pèsent environ 36,7 % du RTP.
+- Jeu de base sans bonus : 29,3 % des tours gagnent, 2× la mise en moyenne. Il pèse environ 59,2 % du RTP.
 
-**Distribution des gains par tour (% des tours)**
+**Distribution des gains par tour (% des tours, gains en × la mise de base)**
 
 | Gain | Mode base | Mode bonus |
 |---|---|---|
-| 0 | 69,3 % | 0 % |
-| 0–1× | 25,7 % | 1,5 % |
-| 1–5× | 1,9 % | 9,3 % |
-| 5–20× | 2,3 % | 37,0 % |
-| 20–100× | 0,79 % | 28,7 % |
-| 100–1 000× | 0,065 % | 23,4 % |
-| 1 000–10 000× | 0,0006 % | 0,034 % |
-| 10 000× (max win) | 0,00001 % | 0,0006 % |
+| 0 | 70,0 % | 0 % |
+| 0–1× | 18,1 % | 0,8 % |
+| 1–5× | 10,9 % | 26,0 % |
+| 5–20× | 0,80 % | 61,3 % |
+| 20–100× | 0,061 % | 4,2 % |
+| 100–1 000× | 0,082 % | 5,9 % |
+| 1 000–10 000× | 0,013 % | 1,7 % |
+| 10 000× (max win) | 0,00001 % | 0,001 % |
+
+En bonus buy, la plupart des achats rapportent entre 5× et 20× la mise, et les gros gains viennent des globes. Le gain médian d'un achat est d'environ 7,6× la mise, pour un coût de 59×.
 
 Pour la célébration des gains, `winLevel` (de 1 à 10) suit les seuils du SDK :
 - **par spin** : 1 = moins de 0,1×, 2 = jusqu'à 1×, 3 = 1–2×, 4 = 2–5×, 5 = 5–15×, 6 = 15–30×, 7 = 30–50×, 8 = 50–100×, 9 = 100× jusqu'au max win, 10 = max win ;
