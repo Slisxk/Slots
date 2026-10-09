@@ -13,7 +13,8 @@ from gamestate import GameState
 from game_config import GameConfig
 from game_config import PARAMS
 from ponderation import ponderer
-from utils.game_analytics.run_analysis import create_stat_sheet
+from utils.game_analytics.retrieve_game_information import GameInformation
+from utils.game_analytics.print_all_results import PrintJSON
 from utils.rgs_verification import execute_all_tests
 from src.state.run_sims import create_books
 from src.write_data.write_configs import generate_configs
@@ -43,5 +44,7 @@ if __name__ == "__main__":
         # Poids des résultats : distribution naturelle du jeu, RTP exact, limites « 3 étoiles »
         ponderer(config, PARAMS, modes)
         generate_configs(gamestate)
-        create_stat_sheet(gamestate, custom_keys=[{"symbol": "scatter"}, {"symbol": "bonus"}])
+        # Statistiques (library/statistics_summary.json). Le classeur xlsx du SDK n'est pas produit :
+        # il dépend des « fences » de l'optimiseur Rust, qui n'est pas utilisé ici.
+        PrintJSON(GameInformation(gamestate, custom_keys=[{"symbol": "scatter"}, {"symbol": "bonus"}]))
         execute_all_tests(config)

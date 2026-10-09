@@ -150,19 +150,19 @@ def main():
             if not (dossier / f).exists():
                 shutil.copy(MODELE / f, dossier / f)
 
-    rng = random.Random(a.seed)
-
-    def bandes(poids):
-        L = int(poids.sum(axis=0).max())   # même longueur pour les 5 rouleaux
+    def bandes(poids, nom, L=None):
+        """Un tirage indépendant par jeu de bandes : changer un jeu ne modifie pas les autres."""
+        rng = random.Random(f"{a.seed}-{nom}")
+        L = L or int(poids.sum(axis=0).max())   # même longueur pour les 5 rouleaux
         return [bande(poids[:, r], codes, L, rows, scatter, rng) for r in range(5)]
 
     nb_bonus = len(p["bonus"])
-    br = bandes(p["poids"]["base"])
-    bb = bandes(p["poids"]["boost"])
-    frs = [bandes(p["poids"][f"fs{k + 1}"]) for k in range(nb_bonus)]
+    br = bandes(p["poids"]["base"], "BR0")
+    bb = bandes(p["poids"]["boost"], "BRB")
+    frs = [bandes(p["poids"][f"fs{k + 1}"], f"FR{k + 1}") for k in range(nb_bonus)]
     wcap_poids = p["poids"][f"fs{min(2, nb_bonus)}"].copy()
     wcap_poids[codes.index(globe)] *= WINCAP_BOOST_GLOBE
-    wc = bandes(wcap_poids)
+    wc = bandes(wcap_poids, "FRWCAP")
     ecrire_bandes(dossier / "reels" / "BR0.csv", br)
     ecrire_bandes(dossier / "reels" / "BRB.csv", bb)
     for k, fr in enumerate(frs):
@@ -171,10 +171,9 @@ def main():
     ancien = dossier / "reels" / "FR0.csv"
     if ancien.exists():
         ancien.unlink()
-    # Bandes d'affichage (tirées après les autres pour ne pas changer les bandes de maths)
-    for nom, poids in (("PAD_BR.csv", p["poids"]["base"]), ("PAD_FR.csv", p["poids"]["fs1"])):
-        ecrire_bandes(dossier / "reels" / nom,
-                      [bande(poids[:, r], codes, 100, rows, scatter, rng) for r in range(5)])
+    # Bandes d'affichage (animation des rouleaux côté front-end seulement)
+    for nom, poids in (("PAD_BR", p["poids"]["base"]), ("PAD_FR", p["poids"]["fs1"])):
+        ecrire_bandes(dossier / "reels" / f"{nom}.csv", bandes(poids, nom, 100))
 
     rtp = round(p["rtp_cible"], 4)
     mv = lambda poids: {str(int(v) if float(v).is_integer() else v): float(w)
