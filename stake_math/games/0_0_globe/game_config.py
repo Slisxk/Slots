@@ -146,8 +146,10 @@ class GameConfig(Config):
                 dist.append(Distribution(criteria=f"bonus{i}", quota=quotas[i],
                                          conditions=conditions(base_reels, {s: 1})))
             dist += [
-                Distribution(criteria="0", quota=0.4, win_criteria=0.0, conditions=conditions(base_reels)),
-                Distribution(criteria="basegame", quota=round(0.599 - sum(quotas.values()), 4),
+                # « 0 » : tours perdants, tous identiques en gain, peu de books suffisent ; « basegame » en
+                # demande beaucoup (les rares spins avec globe pèsent lourd dans le RTP)
+                Distribution(criteria="0", quota=0.1, win_criteria=0.0, conditions=conditions(base_reels)),
+                Distribution(criteria="basegame", quota=round(0.899 - sum(quotas.values()), 4),
                              conditions=conditions(base_reels)),
             ]
             return BetMode(name=nom, cost=cout, rtp=self.rtp, max_win=self.wincap, auto_close_disabled=False,

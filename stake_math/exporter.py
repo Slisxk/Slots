@@ -228,12 +228,12 @@ def main():
         "mult_values": {"basegame": mv(p["multi_w"]["base"])},
         "targets": {
             # Part du RTP donnée au max win, puis probabilité réelle de chaque tour bonus (simulée par la
-            # feuille) selon le critère SDK (grille de départ) et le bonus obtenu : voir ponderation.py
+            # feuille) selon le critère SDK (grille de départ) et le bonus obtenu, et fréquence de gain :
+            # voir ponderation.py
             "wincap_rtp": 0.001,
-            "base": {"joint": [[sim["base"][f"joint{c}{k}"] or 0.0 for k in (1, 2, 3)][:nb_bonus]
-                               for c in (1, 2, 3)][:nb_bonus]},
-            "boost": {"joint": [[sim["boost"][f"joint{c}{k}"] or 0.0 for k in (1, 2, 3)][:nb_bonus]
-                                for c in (1, 2, 3)][:nb_bonus]},
+            **{mode: {"hit": sim[mode]["hit"],
+                      "joint": [[sim[mode][f"joint{c}{k}"] or 0.0 for k in (1, 2, 3)][:nb_bonus]
+                                for c in (1, 2, 3)][:nb_bonus]} for mode in ("base", "boost")},
         },
     }
     with open(dossier / "params.json", "w", encoding="utf-8") as f:
