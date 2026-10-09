@@ -108,8 +108,6 @@ def validate(p):
         sys.exit("La Paytable doit contenir au plus un symbole de type GLOBE.")
     if "PAY" not in p["types"]:
         sys.exit("La Paytable doit contenir au moins un symbole de type PAY.")
-    if p["mode"] == "WILD_ADD" and p["multi_globe"] < 1:
-        sys.exit("En mode WILD_ADD, le multi du globe doit être >= 1.")
     for w in (p["poids_base"], p["poids_fs"]):
         if (w.sum(axis=0) <= 0).any():
             sys.exit("Chaque rouleau doit avoir un poids total > 0.")
@@ -135,33 +133,55 @@ class Moteur:
             "base": p["poids_base"] / p["poids_base"].sum(axis=0),
             "fs": p["poids_fs"] / p["poids_fs"].sum(axis=0),
         }
-        self.cum = {k: np.cumsum(v, axis=0) for k, v in self.prob.items()}
+        # Au plus 1 trophée par rouleau (comme sur les bandes du SDK, où les trophées sont espacés) :
+        # le trophée est présent sur le rouleau avec la probabilité lignes x p, à une rangée au hasard ;
+        # les autres cases sont tirées parmi les symboles hors trophée. Chaque case garde sa
+        # probabilité de la feuille (poids / total).
+        self.q_sc = {k: self.rows * v[self.sc] for k, v in self.prob.items()}
+        for k, q in self.q_sc.items():
+            if (q > 1).any():
+                sys.exit(f"Trop de trophées ({k}) : lignes x P(trophée) doit rester <= 1 sur chaque rouleau.")
+        sans_sc = {}
+        for k, v in self.prob.items():
+            v = v.copy()
+            v[self.sc] = 0
+            sans_sc[k] = v / v.sum(axis=0)
+        self.cum = {k: np.cumsum(v, axis=0) for k, v in sans_sc.items()}
         self.mprob = {
             "base": p["multi_w_base"] / p["multi_w_base"].sum(),
             "fs": p["multi_w_fs"] / p["multi_w_fs"].sum(),
         }
 
     def _tirage(self, n, phase):
-        """Grille (n, lignes, rouleaux) d'indices de symboles, cases indépendantes."""
+        """Grille (n, lignes, rouleaux) d'indices de symboles, au plus 1 trophée par rouleau."""
         u = self.rng.random((n, self.rows, self.reels))
         cum = self.cum[phase]
         grid = np.empty(u.shape, dtype=np.int16)
         for r in range(self.reels):
             grid[:, :, r] = np.searchsorted(cum[:, r], u[:, :, r], side="right")
-        return np.minimum(grid, len(self.p["codes"]) - 1)
+        grid = np.minimum(grid, len(self.p["codes"]) - 1)
+        a_sc = self.rng.random((n, self.reels)) < self.q_sc[phase]
+        rangee = self.rng.integers(0, self.rows, size=(n, self.reels))
+        i, r = np.nonzero(a_sc)
+        grid[i, rangee[i, r], r] = self.sc
+        return grid
 
     def spin(self, n, phase):
         """Joue n spins. Renvoie (gain x mise, nb trophées, a_un_globe, gains par symbole)."""
-        p = self.p
         grid = self._tirage(n, phase)
         trophees = (grid == self.sc).sum(axis=(1, 2))
+        globe, voisin, mult = self.transformer(grid, phase)
+        g = self.evaluer(grid, globe | voisin, mult)        # (n, nb symboles)
+        return g.sum(axis=1), trophees, (globe | voisin).any(axis=(1, 2)), g.sum(axis=0)
 
+    def transformer(self, grid, phase):
+        """Les 8 cases autour de chaque globe deviennent des multiplicateurs
+        (sauf trophées et autres globes, qui restent en place). Renvoie (globe, voisin, mult)."""
+        p = self.p
         if self.gl >= 0:
             globe = grid == self.gl
         else:
             globe = np.zeros(grid.shape, dtype=bool)
-        # Les 8 cases autour de chaque globe deviennent des multiplicateurs
-        # (sauf trophées et autres globes, qui restent en place).
         pad = np.pad(globe, ((0, 0), (1, 1), (1, 1)))
         voisin = np.zeros_like(globe)
         for dr in (-1, 0, 1):
@@ -175,8 +195,11 @@ class Moteur:
         if nv:
             mult[voisin] = self.rng.choice(p["multi_val"], size=nv, p=self.mprob[phase])
         mult[globe] = p["multi_globe"]
-        speciale = globe | voisin
+        return globe, voisin, mult
 
+    def evaluer(self, grid, speciale, mult):
+        """Gains de chaque spin par symbole, (n, nb symboles), en x mise."""
+        p = self.p
         # Les cases spéciales (globe + multis) ne comptent jamais comme symbole naturel.
         nat_grid = np.where(speciale, -1, grid)
         if p["mode"] == "GLOBAL_SUM":
@@ -184,49 +207,57 @@ class Moteur:
         else:
             wild = speciale
         if p["mode_gain"] == "WAYS":
-            g = self._ways(nat_grid, wild, mult)          # (n, nb symboles)
+            g = self._ways(nat_grid, wild, mult)
         else:
             g = self._lignes(nat_grid, wild, mult)
         if p["mode"] == "GLOBAL_SUM":
             spin_mult = mult.sum(axis=(1, 2))
             spin_mult[spin_mult == 0] = 1.0
             g *= spin_mult[:, None]
-        return g.sum(axis=1), trophees, speciale.any(axis=(1, 2)), g.sum(axis=0)
+        return g
 
     def _ways(self, nat_grid, wild, mult):
         """Gains en ways, gauche → droite. Renvoie (n, nb symboles)."""
         p = self.p
         n = nat_grid.shape[0]
+        # Règles alignées sur le math SDK de Stake Engine (src/calculations/ways.py) :
+        # une way doit commencer par le symbole NATUREL sur le rouleau 1 ; ensuite les
+        # wilds comptent sur chaque rouleau. Les ways 100 % wild ne paient pas.
         w = wild.sum(axis=1).astype(float)                 # wilds par rouleau
-        S = (mult * wild).sum(axis=1)                      # somme des multis par rouleau
+        S = (mult * wild).sum(axis=1)                      # somme des multis des wilds, par rouleau
+        big = wild & (mult > 1)
+        nb_big = big.sum(axis=1).astype(float)             # wilds avec un multi > 1
+        S_big = (mult * big).sum(axis=1)
         out = np.zeros((n, len(p["codes"])))
         for s in self.pay_idx:
             nat = (nat_grid == s).sum(axis=1).astype(float)
             c = nat + w
+            amorce = nat[:, 0] > 0
             for j, k in enumerate((3, 4, 5)):
                 pay = p["pays"][s, j]
                 if pay == 0:
                     continue
                 if p["mode"] == "WILD_MULT":
                     # multi d'une way = produit des multis de ses wilds
-                    tot = np.prod(nat[:, :k] + S[:, :k], axis=1)
-                    seul_wild = np.prod(S[:, :k], axis=1)
+                    ways = np.prod(nat[:, :k] + S[:, :k], axis=1)
                 else:
-                    # multi d'une way = somme des multis de ses wilds (1 si aucun wild)
-                    tot = np.prod(nat[:, :k], axis=1)
-                    seul_wild = np.zeros(n)
+                    # multi d'une way = somme de ses multis > 1 (1 si aucun)
+                    ways = np.prod(c[:, :k] - nb_big[:, :k], axis=1)
                     for r in range(k):
                         autres = [i for i in range(k) if i != r]
-                        tot += S[:, r] * np.prod(c[:, autres], axis=1)
-                        seul_wild += S[:, r] * np.prod(w[:, autres], axis=1)
-                ways = tot if s == self.top else tot - seul_wild
+                        ways += S_big[:, r] * np.prod(c[:, autres], axis=1)
+                ways = ways * amorce
                 if k < self.reels:
                     ways = ways * (c[:, k] == 0)           # longueur exacte k
                 out[:, s] += pay * ways
         return out
 
     def _lignes(self, nat_grid, wild, mult):
-        """Gains en lignes, gauche → droite, meilleur gain par ligne. Renvoie (n, nb symboles)."""
+        """Gains en lignes, gauche → droite, mêmes règles que Lines.get_lines du math SDK :
+        la ligne paie soit le 1er symbole naturel (avec les wilds avant et après lui), soit la
+        suite de wilds du début (payée comme le symbole le plus fort) : on garde le plus gros
+        gain AVANT multiplicateur, puis on applique les multis des cases gagnantes.
+        Renvoie (n, nb symboles)."""
         p = self.p
         n = nat_grid.shape[0]
         L = p["lignes"]                                    # (nb lignes, 5), indices de rangée
@@ -234,55 +265,47 @@ class Moteur:
         nat = nat_grid[:, L, cols]                         # (n, nb lignes, 5)
         wl = wild[:, L, cols]
         ml = np.where(wl, mult[:, L, cols], 0.0)
-        best = np.zeros(nat.shape[:2])
-        best_s = np.full(nat.shape[:2], -1)
-        for s in self.pay_idx:
-            run = np.cumprod((nat == s) | wl, axis=2).astype(bool)   # cases de la ligne gagnante
-            longueur = run.sum(axis=2)
-            if s != self.top:                              # il faut au moins 1 symbole naturel
-                longueur = np.where(((nat == s) & run).any(axis=2), longueur, 0)
+
+        def multi(cases):
+            if p["mode"] == "WILD_MULT":
+                return np.prod(np.where(cases & wl, ml, 1.0), axis=2)
+            # comme le SDK (apply_added_symbol_mult) : somme des multis > 1, sinon 1
+            somme = np.where(cases & (ml > 1), ml, 0.0).sum(axis=2)
+            return np.where(somme > 0, somme, 1.0)
+
+        def table(s, longueur):
             pay = np.zeros(longueur.shape)
             for j, k in enumerate((3, 4, 5)):
                 pay[longueur == k] = p["pays"][s, j]
-            if p["mode"] == "WILD_MULT":
-                m = np.prod(np.where(run & wl, ml, 1.0), axis=2)
-            else:
-                somme = np.where(run, ml, 0.0).sum(axis=2)
-                m = np.where(somme > 0, somme, 1.0)
-            g = pay * m
-            mieux = g > best
-            best = np.where(mieux, g, best)
-            best_s = np.where(mieux, s, best_s)
+            return pay
+
+        # Suite de wilds au début de la ligne, puis 1er symbole naturel
+        prefixe = np.cumprod(wl, axis=2).astype(bool)
+        a = prefixe.sum(axis=2)
+        premier = np.take_along_axis(nat, np.minimum(a, self.reels - 1)[..., None], axis=2)[..., 0]
+        premier = np.where(a < self.reels, premier, -1)
+
+        gain_wild = table(self.top, a) if p["mode"] != "GLOBAL_SUM" else np.zeros(a.shape)
+        gain_base = np.zeros(a.shape)
+        run_base = np.zeros(nat.shape, dtype=bool)
+        sym_base = np.full(a.shape, -1)
+        for s in self.pay_idx:
+            sel = premier == s
+            if not sel.any():
+                continue
+            run = np.cumprod((nat == s) | wl, axis=2).astype(bool)
+            g = table(s, run.sum(axis=2))
+            gain_base = np.where(sel, g, gain_base)
+            run_base = np.where(sel[..., None], run, run_base)
+            sym_base = np.where(sel, s, sym_base)
+
+        wild_gagne = gain_wild > gain_base
+        gain = np.where(wild_gagne, gain_wild * multi(prefixe), gain_base * multi(run_base))
+        sym = np.where(wild_gagne, self.top, sym_base)
         out = np.zeros((n, len(p["codes"])))
         for s in self.pay_idx:
-            out[:, s] = np.where(best_s == s, best, 0.0).sum(axis=1)
+            out[:, s] = np.where(sym == s, gain, 0.0).sum(axis=1)
         return out
-
-    def fs_initiaux(self, nb_trophees):
-        table = self.p["table_fs"]
-        out = np.zeros(len(nb_trophees), dtype=np.int64)
-        for seuil, fs in table:                 # table triée : le dernier seuil couvre « et plus »
-            out[nb_trophees >= seuil] = fs
-        return out
-
-    def sessions_fs(self, fs_init, plafond):
-        """Joue des sessions de free spins. Renvoie (gain total, nb de FS joués, gains par symbole)."""
-        n = len(fs_init)
-        total = np.zeros(n)
-        restant = fs_init.astype(float).copy()
-        joues = np.zeros(n, dtype=np.int64)
-        par_symbole = np.zeros(len(self.p["codes"]))
-        actifs = np.flatnonzero(restant > 0)
-        while actifs.size:
-            g, tr, _, ps = self.spin(actifs.size, "fs")
-            total[actifs] += g
-            par_symbole += ps
-            joues[actifs] += 1
-            restant[actifs] += tr * self.p["fs_par_trophee"] - 1
-            fini = (restant[actifs] < 1) | (total[actifs] >= plafond) | \
-                   (joues[actifs] >= MAX_FS_PAR_SESSION)
-            actifs = actifs[~fini]
-        return np.minimum(total, plafond), joues, par_symbole
 
 
 # --------------------------------------------------------------------------- #
