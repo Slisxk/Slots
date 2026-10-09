@@ -269,9 +269,9 @@
   },
   "fs_per_scatter_in_fs": 1,
   "scatter_trigger_weights": {
-    "3": 0.0039085194,
-    "4": 0.0001633181,
-    "5": 2.7295e-06
+    "3": 0.0064441538,
+    "4": 0.000326899,
+    "5": 6.6326e-06
   },
   "mult_values": {
     "basegame": {
@@ -317,9 +317,9 @@
   },
   "targets": {
     "wincap_rtp": 0.001,
-    "freegame_rtp": 0.4381,
-    "freegame_hr": 151.73,
-    "basegame_rtp": 0.5209,
-    "basegame_hr": 2.483
+    "freegame_rtp": 0.4556,
+    "freegame_hr": 147.91,
+    "basegame_rtp": 0.5034,
+    "basegame_hr": 2.499
   }
 }
