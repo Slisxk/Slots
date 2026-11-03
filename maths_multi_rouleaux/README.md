@@ -31,6 +31,7 @@ Simulation de 2 millions de spins : 30,4 % de tours gagnants (1 sur 3,3), écart
 
 | Pour… | Fichier |
 |---|---|
+| Démarrer un nouveau projet Claude pour une slot (tes idées en dessous) | `PROMPT_PROJET.md` (instructions du projet) + `SPEC_MATHS.md`, `README.md` et `sortie/config_fe_*.json` (fichiers du projet) |
 | Faire le front-end (conversation avec Claude) | `PROMPT_SLOT.md` (à coller) + `SPEC_MATHS.md` + `sortie/config_fe_0_0_colonnes.json` (à joindre) |
 | Installer et utiliser tout ça sur ton Mac | `INSTALLATION_MAC.md` |
 | Régler les maths ou faire une autre slot du même type | `classeur_maths.xlsx` + `simulateur.py` |
