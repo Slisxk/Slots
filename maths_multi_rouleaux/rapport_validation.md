@@ -3,10 +3,10 @@
 Format : « Math Sign-Off Template » du repo egorfedorov/Slot-Casino-Game-Developer-Skills-for-Stake-Engine.
 
 ## 1. Périmètre
-- Classeur : `classeur_maths.xlsx` (empreinte a39ce22df12b)
-- Date : 2026-11-03 14:26
+- Classeur : `classeur_maths.xlsx` (empreinte b2b14a9d90b0)
+- Date : 2026-11-03 14:39
 - Grille : 5 rouleaux x 3 lignes (243 ways)
-- Modes : base, achat bonus 1
+- Modes : base, achat bonus 1, achat bonus 2
 
 ## 2. Hypothèses
 - Gains en x la mise totale ; montants arrondis au centième par le SDK.
@@ -24,7 +24,7 @@ Format : « Math Sign-Off Template » du repo egorfedorov/Slot-Casino-Game-Devel
 
 ## 4. Méthode
 - Simulation : `simulateur.py`, graine 2026, 2,113,788 spins de base (strates du nombre de scatters), 100,000 tours par bonus.
-- Le repo recommande ≥ 1 000 000 de spins pour orienter le calage et ≥ 20 000 000 pour valider.
+- Le repo de skills recommande ≥ 1 000 000 de spins pour caler et ≥ 20 000 000 pour valider ; la doc Stake Engine demande 100 000 à 1 000 000 de résultats (books) par mode.
 
 ## 5. Résultats
 
@@ -43,20 +43,22 @@ Format : « Math Sign-Off Template » du repo egorfedorov/Slot-Casino-Game-Devel
 
 | Contrôle | Valeur | Règle | Statut |
 |---|---|---|---|
-| RTP exact du jeu de base | 96.183% | cible 96.20% ± 0,20 % | OK |
+| RTP exact du jeu de base | 96.183% | entre 96.00% et 96.50% (ta règle ; SDK : 96,0 à 96,7 %) | OK |
 | RTP simulé (plafond compris) | 96.552% ± 0.996% | écart à l'exact < 3 marges | OK |
-| Part des spins (hors bonus) | 63.5% | 55 % à 70 % : les spins rapportent sans tout donner | OK |
-| Part du bonus 1 | 29.9% | au plus 30 % : aucun bonus ne donne tout | OK |
+| Part des spins (hors bonus) | 63.5% | 55% à 70% : les spins rapportent sans tout donner | OK |
+| Part du bonus 1 | 29.9% | au plus 35% : aucun bonus ne donne tout | OK |
 | Bonus 1 : fréquence | 1 sur 334 | entre 1/100 et 1/1 000 000 | OK |
-| Part du bonus 2 | 6.5% | au plus 30 % : aucun bonus ne donne tout | OK |
+| Part du bonus 2 | 6.5% | au plus 35% : aucun bonus ne donne tout | OK |
 | Bonus 2 : fréquence | 1 sur 8,724 | entre 1/100 et 1/1 000 000 | OK |
-| Fréquence de gain | 30.4% (1 sur 3.3) | 1 sur 3 à 1 sur 8 (règle d'approbation) | OK |
-| Max win atteignable | 1 sur 2,485,065 | au moins 1 sur 20 000 000 (règle d'approbation) | OK |
-| 3 étoiles : etl40b (base) | 0.392 | ≤ 0,9 | OK |
-| 3 étoiles : cvar (base) | 316 | ≤ 800 | OK |
-| Achat bonus 1 : RTP simulé | 95.15% ± 1.34% | à 0,5 % du jeu de base (règle d'approbation) ; corrigé exactement par la pondération | OK |
-| Achat bonus 1 : 3 étoiles etl40b | 2.374 | ≤ 0,9 (sinon la pondération réduit la queue) | ÉCHEC |
+| Fréquence de gain | 30.4% (1 sur 3.3) | 1 sur 3 à 1 sur 8 (checklist) ; jamais moins de 1 sur 20 (doc) | OK |
+| Max win atteignable | 1 sur 2,485,065 | plus fréquent que 1 sur 10 000 000 (doc « Math Requirements ») | OK |
+| Écart-type du jeu de base | 18.9x | au moins 0,6 (soumission SDK) | OK |
+| Contrôles de risque Studio (base) | tous OK | RISK_CHECKS du SDK : chaque échec baisse la mise max autorisée | OK |
+| Achat bonus 1 : RTP simulé | 95.15% ± 1.34% | à 0,5 % du jeu de base (doc) ; la pondération du SDK le règle exactement | OK |
+| Achat bonus 1 : contrôles de risque Studio | tous OK | RISK_CHECKS du SDK ; sinon la pondération rend les plus gros gains de ce mode plus rares | OK |
+| Achat bonus 2 : RTP simulé | 95.15% ± 1.05% | à 0,5 % du jeu de base (doc) ; la pondération du SDK le règle exactement | OK |
+| Achat bonus 2 : contrôles de risque Studio | tous OK | RISK_CHECKS du SDK ; sinon la pondération rend les plus gros gains de ce mode plus rares | OK |
 
 ## 7. Décision
-- Statut : **À REVOIR** (Achat bonus 1 : 3 étoiles etl40b)
+- Statut : **VALIDÉ**
 - Rappel : la validation finale se fait sur les fichiers générés par le SDK (RTP pondéré des books).

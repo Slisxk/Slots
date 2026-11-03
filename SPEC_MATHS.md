@@ -5,7 +5,7 @@
 > - Le front-end ne calcule rien : il **rejoue les résultats** (« books ») que le serveur de Stake lui envoie.
 > - La direction artistique est **entièrement libre**. Les symboles n'ont que des codes (`H1`, `L3`, `GL`…) ; à toi de leur donner un thème, des visuels, des animations et des sons.
 > - **Ne change pas** les règles, la paytable, les multiplicateurs, les bonus, les prix ni le nombre de free spins décrits ici : ils sont figés dans les fichiers de maths.
-> - Le front-end se construit avec le web SDK officiel : [StakeEngine/web-sdk](https://github.com/StakeEngine/web-sdk) (Svelte 5 + PixiJS 8).
+> - Le front-end se construit avec le web SDK officiel : [engineio/web-sdk](https://github.com/engineio/web-sdk) (Svelte 5 + PixiJS 8).
 
 ---
 
@@ -20,9 +20,9 @@
 | Bonus | **3 bonus** : 3 symboles bonus → Bonus 1 (10 FS) ; 4 → Bonus 2 « super » (12 FS) ; 5 → Bonus 3, **caché** (5 FS, un globe garanti à chaque FS). Pendant les FS, chaque symbole bonus = **+1 FS** |
 | Spins boostés | 1,25 × la mise : bonus environ 1,6 fois plus fréquents (mode `boost`) |
 | Bonus buy | Bonus 1 : 59 × la mise ; Bonus 2 : 160 × la mise ; le bonus caché ne s'achète pas |
-| RTP | 96,00 % dans les 4 modes (`base`, `boost`, `bonus`, `super`) |
+| RTP | 96,20 % dans les 4 modes (`base`, `boost`, `bonus`, `super`) |
 | Max win | **10 000 × la mise** |
-| Volatilité | Élevée : écart-type de 25 × la mise par tour en jeu de base ; toutes les limites « 3 étoiles » du SDK sont respectées dans les 4 modes |
+| Volatilité | Élevée : écart-type de 25 × la mise par tour en jeu de base ; les 6 contrôles de risque du math SDK passent dans les 4 modes (mise maximale autorisée : 1 000 $) |
 | Fréquence de gain | 30,0 % des tours |
 | Fréquence des bonus (jeu de base) | Bonus 1 : 1 tour sur 192 ; Bonus 2 : 1 sur 3 300 ; bonus caché : 1 sur 87 000 |
 
@@ -170,20 +170,20 @@ Dans le bonus caché, le `board` de chaque `reveal` des free spins contient touj
 
 ## 8. Statistiques
 
-Elles sont calculées sur les fichiers générés (20 000 résultats par mode), avec les fonctions de vérification du math SDK. Pour la publication, il faudra relancer avec 100 000 résultats ou plus par mode : les chiffres bougeront un peu, le RTP reste exactement 96,00 %.
+Elles sont calculées sur les fichiers générés (20 000 résultats par mode), avec les fonctions de vérification du math SDK. Pour la publication, il faudra relancer avec 100 000 résultats ou plus par mode : les chiffres bougeront un peu, le RTP reste exactement 96,20 %.
 
 **Comment les poids sont calculés.** Les poids des résultats viennent d'une **pondération naturelle** (`ponderation.py`), pas de l'optimiseur Rust du SDK, qui déformait fortement la distribution des gains. Chaque catégorie de résultats (chaque bonus, les gains sans bonus, les tours perdants) garde la probabilité réelle mesurée par la feuille de calcul. Ensuite :
-- le RTP est ajusté pour tomber exactement sur 96,00 %, par la plus petite correction possible des gains sans bonus (bruit des résultats) ;
-- en bonus buy, les gains de 2 360× et plus (Bonus 1) ou de 6 400× et plus (Bonus 2) sont rendus environ 9 et 6 fois plus rares, pour respecter la limite « 3 étoiles » `etl40b`.
+- le RTP est ajusté pour tomber exactement sur 96,20 %, par la plus petite correction possible des gains sans bonus (bruit des résultats) ;
+- aucun gros gain n'est rendu plus rare : les 4 modes passent naturellement les contrôles de risque du math SDK.
 
 | | `base` (1×) | `boost` (1,25×) | `bonus` (59×) | `super` (160×) |
 |---|---|---|---|---|
-| RTP | **96,00 %** | **96,00 %** | **96,00 %** | **96,00 %** |
-| Gain moyen (× la mise de base) | 0,96 | 1,20 | 56,6 | 153,6 |
+| RTP | **96,20 %** | **96,20 %** | **96,20 %** | **96,20 %** |
+| Gain moyen (× la mise de base) | 0,96 | 1,20 | 56,8 | 153,9 |
 | Fréquence de gain | 30,0 % | 29,9 % | 99,9 % | 100 % |
-| Écart-type (× la mise) | 25,4 | 30,1 | 225 | 500 |
-| Gain médian | 0 | 0 | 7,7× | 10,1× |
-| Max win (10 000×) | 1 tour sur 10 000 000 | 1 sur 8 000 000 | 1 achat sur 170 000 | 1 achat sur 41 000 |
+| Écart-type (× la mise) | 25,4 | 30,1 | 244 | 516 |
+| Gain médian | 0 | 0 | 7,6× | 10,1× |
+| Max win (10 000×) | 1 tour sur 10 000 000 | 1 sur 8 000 000 | 1 achat sur 170 000 | 1 achat sur 16 000 |
 
 **Fréquence et valeur des bonus**
 
@@ -195,15 +195,19 @@ Elles sont calculées sur les fichiers générés (20 000 résultats par mode), 
 
 Le bonus caché paie presque toujours gros (gain médian ≈ 1 600×), car chacun de ses free spins a un globe. Les deux autres bonus sont très « loterie » : la plupart rapportent entre 5× et 20× la mise, et les gros gains viennent des globes.
 
-**Limites « 3 étoiles » du SDK** (`utils/rgs_verification.py`), toutes respectées :
+**Contrôles du math SDK** (`utils/rgs_verification.py`, version de novembre 2026), tous respectés.
 
-| Critère | Limite | `base` | `boost` | `bonus` | `super` |
+Ce ne sont pas les « étoiles » de Stake : celles-ci (0 à 3) sont une note de qualité donnée par 3 relecteurs (créativité, finition), indépendante des maths.
+
+| Contrôle | Limite | `base` | `boost` | `bonus` | `super` |
 |---|---|---|---|---|---|
-| `etl40b` (espérance des gains ≥ 40× le coût) | ≤ 0,9 | 0,599 | 0,820 | 0,880 | 0,880 |
-| `etl10k` (espérance des gains ≥ 10 000×) | ≤ 0,8 | 0,001 | 0,001 | 0,059 | 0,244 |
-| `cvar` (gain moyen des 0,1 % meilleurs tours, en × le coût) | ≤ 800 | 579 | 607 | 43 | 38 |
-| `prob5k` / `prob10k` | ≤ 1 % / 0,5 % | ≈ 0 | ≈ 0 | ≈ 0 | 0,1 % / ≈ 0 |
-| RTP | ≤ 96,7 % | 96,00 % | 96,00 % | 96,00 % | 96,00 % |
+| RTP de chaque mode (soumission) | 96,0 à 96,7 % | 96,20 % | 96,20 % | 96,20 % | 96,20 % |
+| Écart-type du jeu de base (soumission) | ≥ 0,6 | 25,4 | | | |
+| Écart-type / coût (risque) | ≤ 60 | 25,4 | 24,1 | 4,1 | 3,2 |
+| Part du RTP venant des gains ≥ 40× le coût | ≤ 0,9 | 0,60 | 0,66 | 0,09 | 0,03 |
+| Part du RTP venant des gains ≥ 10 000× | ≤ 0,8 | 0,001 | 0,001 | 0,001 | 0,004 |
+| `cvar` : gain moyen des 0,1 % meilleurs tours, / coût | ≤ 700 | 581 | 607 | 60 | 43 |
+| Gains de 5 000× et plus | ≤ 5 % des tours | ≈ 0 | ≈ 0 | ≈ 0 | 0,15 % |
 
 **Distribution des gains par tour (% des tours, gains en × la mise de base)**
 
@@ -211,12 +215,12 @@ Le bonus caché paie presque toujours gros (gain médian ≈ 1 600×), car chacu
 |---|---|---|---|---|
 | 0 | 70,0 % | 70,1 % | 0,13 % | 0,04 % |
 | 0–1× | 18,0 % | 17,8 % | 0,71 % | 0,27 % |
-| 1–5× | 11,1 % | 11,0 % | 25,8 % | 14,8 % |
-| 5–20× | 0,75 % | 0,91 % | 61,4 % | 61,7 % |
+| 1–5× | 11,1 % | 11,0 % | 25,9 % | 14,8 % |
+| 5–20× | 0,75 % | 0,91 % | 61,6 % | 61,8 % |
 | 20–100× | 0,049 % | 0,066 % | 4,4 % | 6,8 % |
-| 100–1 000× | 0,083 % | 0,110 % | 5,8 % | 11,1 % |
-| 1 000–10 000× | 0,019 % | 0,024 % | 1,7 % | 5,3 % |
-| 10 000× (max win) | 0,00001 % | 0,00001 % | 0,0006 % | 0,0024 % |
+| 100–1 000× | 0,083 % | 0,110 % | 5,6 % | 11,0 % |
+| 1 000–10 000× | 0,019 % | 0,024 % | 1,6 % | 5,3 % |
+| 10 000× (max win) | 0,00001 % | 0,00001 % | 0,0006 % | 0,0062 % |
 
 Pour la célébration des gains, `winLevel` (de 1 à 10) suit les seuils du SDK :
 - **par spin** : 1 = moins de 0,1×, 2 = jusqu'à 1×, 3 = 1–2×, 4 = 2–5×, 5 = 5–15×, 6 = 15–30×, 7 = 30–50×, 8 = 50–100×, 9 = 100× jusqu'au max win, 10 = max win ;
@@ -314,7 +318,7 @@ D'après les règles d'approbation de Stake Engine ([stakeengine.org/docs/approv
 - **Mineurs** : rien qui puisse attirer les mineurs. Pas d'enfants ni de personnages enfantins, pas de thème scolaire ou enfantin.
 - **Contenu** : pas de contenu choquant ou de mauvais goût, et une qualité visuelle suffisante.
 - **Jeu sans état** : chaque tour est indépendant, sans jackpot, sans quitte-ou-double ni encaissement anticipé. Les maths respectent déjà cette règle.
-- **Page de règles** : le jeu doit avoir une page de règles claire, à partir de la section 3, avec la paytable, le RTP de 96,00 % (identique dans les 4 modes : jeu de base, spins boostés et les deux bonus buy), le max win de 10 000x, et la description des 3 bonus.
+- **Page de règles** : le jeu doit avoir une page de règles claire, à partir de la section 3, avec la paytable, le RTP de 96,20 % (identique dans les 4 modes : jeu de base, spins boostés et les deux bonus buy), le max win de 10 000x, et la description des 3 bonus.
 - **Bonus caché** : « caché » veut dire qu'il n'est pas mis en avant à l'écran (pas de bouton, pas de compteur). Il doit quand même être décrit dans la page de règles (5 symboles bonus, 5 FS, globe garanti) : un joueur doit pouvoir savoir qu'il existe.
 
 ---

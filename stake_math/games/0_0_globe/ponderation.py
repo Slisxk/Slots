@@ -13,9 +13,11 @@ la distribution des gains ; ici on garde la distribution NATURELLE du jeu, mesur
   * puis le RTP est ajusté exactement par un « basculement exponentiel » (poids × exp(θ·gain)) : le plus
     petit écart possible à la distribution naturelle. Il ne corrige que le bruit des books. Dans les modes
     base / boost, il ne touche que les gains sans bonus, dont la moyenne est la plus bruitée ;
-  * limites « 3 étoiles » du SDK (utils/rgs_verification.py) : si l'espérance des gains >= 40x le coût
-    du mode (etl40b) ou >= 10 000x (etl10k) dépasse sa limite, seuls ces gros gains sont rendus plus
-    rares, juste assez pour passer, le RTP restant exact.
+  * contrôles de risque « Studio » du math SDK (utils/rgs_verification.py, RISK_CHECKS « Tail liability ») :
+    part du RTP venant des gains >= 40x le coût (etl40b / coût <= 0,9), des gains >= 10 000x
+    (etl10k / coût <= 0,8), les deux ensemble (<= 1,5) et en mises de base (etl40b + etl10k <= 10 000).
+    Si une limite est dépassée, seuls ces gros gains sont rendus plus rares, juste assez pour passer,
+    le RTP restant exact. Un contrôle raté ne bloque pas la publication mais baisse la mise maximale.
 
 Écrit library/publish_files/lookUpTable_<mode>_0.csv (format RGS : id, poids uint64, payout).
 """
@@ -30,8 +32,11 @@ import numpy as np
 import zstandard
 
 TOTAL = 2**60          # somme des poids (doit rester <= uint64)
-ETL40_LIMITE, ETL40_CIBLE = 0.9, 0.88    # limite « 3 étoiles » du SDK et cible (les poids sont exacts)
+# Contrôles de risque « Tail liability » du math SDK (valeurs rapportées au coût du mode) et cibles
+ETL40_LIMITE, ETL40_CIBLE = 0.9, 0.88
 ETL10K_LIMITE, ETL10K_CIBLE = 0.8, 0.78
+SOMME_LIMITE, SOMME_CIBLE = 1.5, 1.47
+ABS_LIMITE, ABS_CIBLE = 10_000, 9_800
 
 
 def _lire_books(path):
@@ -57,16 +62,20 @@ def _bisection(f, lo, hi, n=100):
     return (lo + hi) / 2
 
 
-def _contraindre(evaluer):
-    """Cherche (l40, l10k) <= 0, le plus près de 0 possible, pour respecter les limites 3 étoiles.
-    evaluer(l40, l10k) -> (etl40b, etl10k)."""
+def _contraindre(evaluer, cout):
+    """Cherche (l40, l10k) <= 0, le plus près de 0 possible, pour passer les contrôles « Tail liability ».
+    evaluer(l40, l10k) -> (etl40b, etl10k) en mises de base (comme le SDK, avant division par le coût)."""
     l40 = l10k = 0.0
     e40, e10 = evaluer(0.0, 0.0)
-    if e40 > ETL40_LIMITE:
-        l40 = _bisection(lambda x: evaluer(x, 0.0)[0] - ETL40_CIBLE, -60.0, 0.0)
+    if e40 / cout > ETL40_LIMITE:
+        l40 = _bisection(lambda x: evaluer(x, 0.0)[0] / cout - ETL40_CIBLE, -60.0, 0.0)
         e40, e10 = evaluer(l40, 0.0)
-    if e10 > ETL10K_LIMITE:
-        l10k = _bisection(lambda x: evaluer(l40, x)[1] - ETL10K_CIBLE, -60.0, 0.0)
+    if e10 / cout > ETL10K_LIMITE:
+        l10k = _bisection(lambda x: evaluer(l40, x)[1] / cout - ETL10K_CIBLE, -60.0, 0.0)
+        e40, e10 = evaluer(l40, l10k)
+    cible = min(SOMME_CIBLE * cout, ABS_CIBLE)
+    if (e40 + e10) / cout > SOMME_LIMITE or e40 + e10 > ABS_LIMITE:
+        l40 = _bisection(lambda x: sum(evaluer(x, l10k)) - cible, -60.0, l40)
     return l40, l10k
 
 
@@ -128,7 +137,7 @@ def _ajuster(books, w0, cible_ev, cout, p_wc, ajustables=None):
         e10 = (p_wc * moy_wc if moy_wc >= 10_000 else 0.0) + p_reste * (f10 + masse * float(w[q10] @ pays[q10]))
         return e40, e10
 
-    l40, l10k = _contraindre(evaluer)
+    l40, l10k = _contraindre(evaluer, cout)
     w, theta = bascule(l40, l10k)
     poids = {i: p_reste * masse * float(wi) for i, wi in zip(adj, w)}
     poids.update({i: p_reste * float(wi) for i, wi in zip(fixes, wf)})
@@ -138,6 +147,7 @@ def _ajuster(books, w0, cible_ev, cout, p_wc, ajustables=None):
     detail = {"wincap": round(p_wc, 10),
               "moyenne_naturelle": round(float(base @ pays), 4), "moyenne_cible": round(float(cible_adj), 4),
               "theta": theta, "etl40b": round(float(e40), 4), "etl10k": round(float(e10), 4),
+              "etl40b_sur_cout": round(float(e40) / cout, 4), "etl10k_sur_cout": round(float(e10) / cout, 4),
               "gros_gains_rendus_plus_rares_x": round(math.exp(-l40), 2),
               "max_win_rendu_plus_rare_x": round(math.exp(-l10k), 2)}
     return poids, detail

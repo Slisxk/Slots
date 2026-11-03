@@ -1,6 +1,6 @@
 # Maths Stake Engine : grille 5x5, clusters + cascades, globe à multiplicateurs, 3 bonus
 
-Ce dossier transforme la feuille de calcul (`../modele_maths/modele_maths.xlsx`) en jeu pour le **math SDK officiel de Stake Engine** ([StakeEngine/math-sdk](https://github.com/StakeEngine/math-sdk)). Le SDK produit les fichiers à déposer sur Stake Engine : books, lookup tables et `index.json`.
+Ce dossier transforme la feuille de calcul (`../modele_maths/modele_maths.xlsx`) en jeu pour le **math SDK officiel de Stake Engine** ([engineio/math-sdk](https://github.com/engineio/math-sdk)). Le SDK produit les fichiers à déposer sur Stake Engine : books, lookup tables et `index.json`.
 
 Les symboles sont génériques (`H1`…`L3`, `BN` pour le symbole bonus, `GL` pour le globe). Tu peux donc changer la DA côté front-end sans toucher aux maths.
 
@@ -27,7 +27,7 @@ stake_math/
     ├── game_executables.py  transformation autour du globe + calcul des gains
     ├── game_events.py     événement « globeMultipliers » pour le front-end
     ├── game_override.py   choix du bonus, bandes et multis de chaque bonus, globe garanti
-    ├── ponderation.py     poids des résultats : distribution naturelle, RTP exact, limites « 3 étoiles »
+    ├── ponderation.py     poids des résultats : distribution naturelle, RTP exact, contrôles de risque du SDK
     └── run.py             simulation, pondération, stats et vérifications
 ```
 
@@ -41,7 +41,7 @@ stake_math/
    Avec un autre `--game-id`, les fichiers Python sont recopiés dans `games/<game-id>/`.
 3. **Installer le math SDK** (Python 3.12+), à la racine de ce repo, à côté de `stake_math/` :
    ```bash
-   git clone https://github.com/StakeEngine/math-sdk.git && cd math-sdk && make setup
+   git clone https://github.com/engineio/math-sdk.git && cd math-sdk && make setup
    env/bin/pip install openpyxl   # pour verifier_sdk.py
    ```
 4. **Copier le jeu** dans le SDK, puis lancer la génération :
@@ -95,6 +95,6 @@ Les combinaisons gérées nativement par le SDK, à choisir dans la feuille :
 - **RTP final** : `ponderation.py` pondère les books en gardant la distribution naturelle du jeu.
   - Chaque tour bonus (critère SDK × bonus obtenu) garde sa probabilité réelle, mesurée par la feuille ; le max win reçoit 0,1 % du RTP.
   - Le RTP est ajusté exactement à la cible.
-  - Les gros gains (≥ 40× le coût du mode, ou ≥ 10 000×) ne sont rendus plus rares que si les limites « 3 étoiles » `etl40b` / `etl10k` du SDK l'exigent.
+  - Les gros gains ne sont rendus plus rares que si un contrôle de risque « Tail liability » du math SDK l'exige (part du RTP venant des gains ≥ 40× le coût ou ≥ 10 000×). Avec les réglages actuels, aucun mode n'en a besoin.
 
   L'optimiseur Rust du SDK n'est plus utilisé : avec les réglages de l'exemple officiel, il déformait fortement la distribution des gains.

@@ -211,8 +211,8 @@
       "scatters": 4,
       "spins": 10,
       "sticky": true,
-      "buy_cost": null,
-      "mode": null,
+      "buy_cost": 568.0,
+      "mode": "super",
       "reels": "FR2",
       "column_multipliers": {
         "act": [

@@ -4,7 +4,7 @@
   "provider_number": 0,
   "provider_name": "mon_studio",
   "working_name": "Globe Multipliers",
-  "rtp": 0.96,
+  "rtp": 0.962,
   "wincap": 10000.0,
   "win_type": "cluster",
   "multi_mode": "WILD_ADD",

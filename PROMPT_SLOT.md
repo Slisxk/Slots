@@ -9,8 +9,8 @@ Je veux créer le front-end d'une slot pour Stake Engine. Les maths sont déjà 
 Une slot complète, jouable et prête à être publiée sur Stake Engine, avec **ma propre direction artistique**. Les maths ne bougent pas : le front-end ne fait que rejouer les résultats envoyés par le serveur de Stake (les « books »).
 
 ## Règles à respecter
-1. **Ne modifie jamais les maths** : ni les règles, ni la paytable, ni les multiplicateurs, ni les 3 bonus, ni le nombre de FS, ni les prix (spins boostés 1,25×, achats 59× et 160×), ni le RTP (96,00 %), ni le max win (10 000×). Si quelque chose te semble manquer dans la spec, demande-moi avant d'inventer.
-2. **Utilise le web SDK officiel de Stake Engine** : https://github.com/StakeEngine/web-sdk (Svelte 5 + PixiJS 8, Node 22). Pars de son exemple de jeu le plus proche (cascades / clusters) et adapte-le.
+1. **Ne modifie jamais les maths** : ni les règles, ni la paytable, ni les multiplicateurs, ni les 3 bonus, ni le nombre de FS, ni les prix (spins boostés 1,25×, achats 59× et 160×), ni le RTP (96,20 %), ni le max win (10 000×). Si quelque chose te semble manquer dans la spec, demande-moi avant d'inventer.
+2. **Utilise le web SDK officiel de Stake Engine** : https://github.com/engineio/web-sdk (Svelte 5 + PixiJS 8, Node 22). Pars de son exemple de jeu le plus proche (cascades / clusters) et adapte-le.
 3. **Gère chaque événement de la section 7** de la spec, dans l'ordre où ils arrivent. Fais particulièrement attention à :
    - `globeMultipliers`, l'événement propre à ce jeu : animation du globe, puis transformation des 8 cases voisines en wilds multiplicateurs avec leur valeur ;
    - `tumbleBoard` : cascades, avec `explodingSymbols` à dédoublonner ;

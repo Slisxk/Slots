@@ -65,7 +65,7 @@ class GameConfig(Config):
         self.col_mult = {"base": cm(p["column_multipliers"]["base"])}
         for i, b in self.bonuses.items():
             self.col_mult[i] = cm(b["column_multipliers"])
-        self.wincap_activation_boost = 2.0   # résultats « max win » : multis 2x plus fréquents (fabrication seulement)
+        self.wincap_activation_boost = 3.0   # résultats « max win » : multis 3x plus fréquents (fabrication seulement)
 
         self.reels = {"BR0": self.read_reels_csv(os.path.join(self.reels_path, "BR0.csv"))}
         for b in p["bonuses"]:

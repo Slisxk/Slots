@@ -10,7 +10,7 @@ spin. Bonus « collants » : un multi reste sur sa colonne jusqu'à la fin du bo
 nouveau multi sur cette colonne s'ajoute à sa valeur.
 
 Il lit tous les paramètres dans le classeur (plages nommées), calcule le RTP exact de chaque
-composante, simule des millions de tours (distribution, volatilité, max win, limites « 3 étoiles »)
+composante, simule des millions de tours (distribution, volatilité, max win, contrôles de risque du math SDK)
 et réécrit l'onglet « Simulation » et le rapport de validation (rapport_validation.md).
 
     python simulateur.py classeur_maths.xlsx
@@ -129,6 +129,12 @@ def validate(p):
         q = p["rows"] * w[t.index("SCATTER")] / w.sum(axis=0)
         if (q > 1).any():
             sys.exit(f"Poids {ph} : trop de scatters (lignes x P(scatter) doit rester <= 1).")
+    # Règle du math SDK (verify_lookup_format) : gains par pas de 0,1x la mise (payoutMultiplier multiple de 10)
+    pays = p["pays"][[i for i, x in enumerate(t) if x == "PAY"]]
+    if (np.abs(pays * 10 - np.round(pays * 10)) > 1e-9).any():
+        sys.exit("Paytable : chaque gain doit être un multiple de 0,1 (le SDK n'accepte que des gains par pas de 0,1x la mise).")
+    if (np.abs(p["multi_val"] - np.round(p["multi_val"])) > 1e-9).any():
+        sys.exit("Multis : les valeurs doivent être entières (gains par pas de 0,1x la mise).")
     for ph in p["phases"]:
         if p["multi_w"][ph].sum() <= 0 and p["multi_act"][ph].sum() > 0:
             sys.exit(f"Multis {ph} : des colonnes peuvent recevoir un multi mais aucune valeur n'a de poids.")
@@ -374,9 +380,11 @@ def _stats(r, w, cout, cap):
     seuil = r[srt][min(i0, len(r) - 1)]
     queue = r >= seuil
     cvar = float((w * r)[queue].sum() / w[queue].sum())
+    etl40, etl10k = float((w * r)[r >= 40 * cout].sum()), float((w * r)[r >= 10_000].sum())
     return {"moy": moy, "hit": float(w[r > 0].sum()), "ecart_type": float(np.sqrt(max((w * r * r).sum() - moy ** 2, 0))),
-            "mediane": med, "etl40b": float((w * r)[r >= 40 * cout].sum()), "etl10k": float((w * r)[r >= 10_000].sum()),
-            "p_max": float(w[r >= cap].sum()), "max": float(r.max()), "cvar": cvar / cout}
+            "mediane": med, "etl40b": etl40 / cout, "etl10k": etl10k / cout, "etl_abs": etl40 + etl10k,
+            "p_max": float(w[r >= cap].sum()), "p5k": float(w[r >= 5_000].sum()), "max": float(r.max()),
+            "cvar": cvar / cout, "cvar_abs": cvar}
 
 
 def _distribution(r, w, cap):
@@ -488,17 +496,36 @@ def simuler(p, spins=None, buy=None, verbose=True):
 # --------------------------------------------------------------------------- #
 # Contrôles (règles Stake Engine + équilibre)
 # --------------------------------------------------------------------------- #
+# Limites du math SDK de Stake Engine (utils/rgs_verification.py) et de la doc d'approbation
+SOUMISSION = {"rtp_min": 0.960, "rtp_max": 0.967, "cout_max": 50_000, "gain_max": 1_000_000, "ecart_type_base_min": 0.6}
+RISQUE = {"ecart_type": 60, "cvar": 700, "cvar_abs": 50_000, "etl40b": 0.9, "etl10k": 0.8, "etl_somme": 1.5,
+          "etl_abs": 10_000, "p5k": 0.05}
+MAX_WIN_RARETE = 10_000_000      # doc « Math Requirements » : max win plus fréquent que 1 sur 10 000 000
+HIT_MIN_ABSOLU = 1 / 20          # doc : au moins 1 tour gagnant sur 20
+
+
+def controles_risque(s, cout):
+    """Contrôles de risque « Studio » du SDK (RISK_CHECKS) pour un mode. Renvoie la liste des échecs."""
+    ech = []
+    for cle, val in (("ecart_type", s["ecart_type"] / cout), ("cvar", s["cvar"]), ("cvar_abs", s["cvar_abs"]),
+                     ("etl40b", s["etl40b"]), ("etl10k", s["etl10k"]), ("etl_somme", s["etl40b"] + s["etl10k"]),
+                     ("etl_abs", s["etl_abs"]), ("p5k", s["p5k"])):
+        if val > RISQUE[cle]:
+            ech.append(f"{cle} {val:.3g} > {RISQUE[cle]:g}")
+    return ech
+
+
 def controles(p, r):
-    """Liste de (contrôle, valeur, règle, OK/ÉCHEC/À SURVEILLER)."""
+    """Liste de (contrôle, valeur, règle, statut)."""
     e, b = r["exact"], r.get("base")
-    cible = p["rtp_cible"]
     L = []
 
-    def add(nom, val, regle, ok, txt=None):
-        L.append((nom, txt if txt is not None else val, regle, "OK" if ok else "ÉCHEC"))
+    def add(nom, val, regle, ok):
+        L.append((nom, val, regle, "OK" if ok else "ÉCHEC"))
 
     lo, hi = p["rtp_min"], p["rtp_max"]
-    add("RTP exact du jeu de base", f"{e['rtp']:.3%}", f"entre {lo:.2%} et {hi:.2%}", lo <= e["rtp"] <= hi)
+    add("RTP exact du jeu de base", f"{e['rtp']:.3%}", f"entre {lo:.2%} et {hi:.2%} (ta règle ; SDK : 96,0 à 96,7 %)",
+        lo <= e["rtp"] <= hi and SOUMISSION["rtp_min"] <= e["rtp"] <= SOUMISSION["rtp_max"])
     if b:
         add("RTP simulé (plafond compris)", f"{b['rtp']:.3%} ± {b['marge']:.3%}", "écart à l'exact < 3 marges",
             abs(b["rtp"] - e["rtp"]) <= 3 * b["marge"] + 0.001)
@@ -513,26 +540,27 @@ def controles(p, r):
             1e-6 <= e[f"bonus{k}"]["freq"] <= 0.01)
     if b:
         h0, h1 = p["hit"]
-        add("Fréquence de gain", f"{b['hit']:.1%} (1 sur {1 / b['hit']:.1f})", f"1 sur {1 / h1:.0f} à 1 sur {1 / h0:.0f} (règle d'approbation)",
-            h0 <= b["hit"] <= h1)
+        add("Fréquence de gain", f"{b['hit']:.1%} (1 sur {1 / b['hit']:.1f})",
+            f"1 sur {1 / h1:.0f} à 1 sur {1 / h0:.0f} (checklist) ; jamais moins de 1 sur 20 (doc)",
+            h0 <= b["hit"] <= h1 and b["hit"] >= HIT_MIN_ABSOLU)
         pm = b["p_max"]
         add("Max win atteignable", f"1 sur {1 / pm:,.0f}" if pm else "jamais observé",
-            "au moins 1 sur 20 000 000 (règle d'approbation)", pm >= 1 / 20e6)
-        add("3 étoiles : etl40b (base)", f"{b['etl40b']:.3f}", "≤ 0,9", b["etl40b"] <= 0.9)
-        add("3 étoiles : cvar (base)", f"{b['cvar']:.0f}", "≤ 800", b["cvar"] <= 800)
+            "plus fréquent que 1 sur 10 000 000 (doc « Math Requirements »)", pm >= 1 / MAX_WIN_RARETE)
+        add("Écart-type du jeu de base", f"{b['ecart_type']:.1f}x", "au moins 0,6 (soumission SDK)",
+            b["ecart_type"] >= SOUMISSION["ecart_type_base_min"])
+        ech = controles_risque(b, 1.0)
+        add("Contrôles de risque Studio (base)", "tous OK" if not ech else ", ".join(ech),
+            "RISK_CHECKS du SDK : chaque échec baisse la mise max autorisée", not ech)
     for k, a in r.get("achats", {}).items():
         if not a["prix"]:
             continue
         add(f"Achat bonus {k} : RTP simulé", f"{a['rtp']:.2%} ± {a['marge']:.2%}",
-            "à 0,5 % du jeu de base (règle d'approbation) ; corrigé exactement par la pondération",
-            abs(a["rtp"] - cible) <= 0.005 + a["marge"])
-        ok = a["etl40b"] <= 0.9
-        L.append((f"Achat bonus {k} : 3 étoiles etl40b", f"{a['etl40b']:.3f}",
-                  "≤ 0,9 ; sinon la pondération du SDK rend les gains ≥ 40x le prix plus rares, dans ce mode seulement",
-                  "OK" if ok else f"CORRIGÉ PAR LA PONDÉRATION (≈ x{a['etl40b'] / 0.88:.1f} plus rares)"))
-        L.append((f"Achat bonus {k} : 3 étoiles etl10k", f"{a['etl10k']:.3f}",
-                  "≤ 0,8 ; sinon la pondération rend le max win plus rare dans ce mode",
-                  "OK" if a["etl10k"] <= 0.8 else "CORRIGÉ PAR LA PONDÉRATION"))
+            "à 0,5 % du jeu de base (doc) ; la pondération du SDK le règle exactement",
+            abs(a["rtp"] - e["rtp"]) <= 0.005 + a["marge"])
+        ech = controles_risque(a, a["prix"])
+        L.append((f"Achat bonus {k} : contrôles de risque Studio", "tous OK" if not ech else ", ".join(ech),
+                  "RISK_CHECKS du SDK ; sinon la pondération rend les plus gros gains de ce mode plus rares",
+                  "OK" if not ech else "CORRIGÉ PAR LA PONDÉRATION"))
     return L
 
 
@@ -545,8 +573,8 @@ LIBELLES_SIM = {
     "date": "Date de la simulation", "spins": "Spins simulés", "rtp": "RTP simulé (plafond compris)",
     "marge": "Marge d'erreur (± à 95 %)", "rtp_spins": "RTP des spins (hors bonus)", "hit": "Fréquence de gain",
     "ecart_type": "Écart-type par tour (x mise)", "mediane": "Gain médian", "max": "Max observé (x mise)",
-    "p_max": "Probabilité du max win", "etl40b": "3 étoiles : etl40b (≤ 0,9)", "etl10k": "3 étoiles : etl10k (≤ 0,8)",
-    "cvar": "3 étoiles : cvar (≤ 800)",
+    "p_max": "Probabilité du max win", "etl40b": "Risque : part du RTP ≥ 40x le coût (≤ 0,9)", "etl10k": "Risque : part du RTP ≥ 10 000x (≤ 0,8)",
+    "cvar": "Risque : cvar, 0,1 % des meilleurs tours / coût (≤ 700)",
     **{f"freq{k}": f"Bonus {k} : probabilité par spin" for k in (1, 2, 3)},
     **{f"gain{k}": f"Bonus {k} : gain moyen (x mise)" for k in (1, 2, 3)},
     **{f"fsm{k}": f"Bonus {k} : FS joués en moyenne" for k in (1, 2, 3)},
@@ -557,8 +585,8 @@ LIGNES_ACHAT = ["sessions", "prix", "gain", "rtp", "marge", "prix_conseille", "m
 LIBELLES_ACHAT = {"sessions": "Tours simulés", "prix": "Prix (x mise)", "gain": "Gain moyen (x mise)",
                   "rtp": "RTP au prix actuel", "marge": "Marge d'erreur (± à 95 %)",
                   "prix_conseille": "Prix conseillé (gain moyen / RTP cible)", "mediane": "Gain médian",
-                  "max": "Max observé", "p_max": "Probabilité du max win", "etl40b": "3 étoiles : etl40b (≤ 0,9)",
-                  "etl10k": "3 étoiles : etl10k (≤ 0,8)", "cvar": "3 étoiles : cvar (≤ 800)"}
+                  "max": "Max observé", "p_max": "Probabilité du max win", "etl40b": "Risque : part du RTP ≥ 40x le prix (≤ 0,9)",
+                  "etl10k": "Risque : part du RTP ≥ 10 000x (≤ 0,8)", "cvar": "Risque : cvar / prix (≤ 700)"}
 SIM_L0 = 5                                   # 1re ligne du bloc « jeu de base »
 SIM_A0 = SIM_L0 + len(LIGNES_SIM) + 2        # en-tête du bloc « achats »
 SIM_C0 = SIM_A0 + len(LIGNES_ACHAT) + 3      # en-tête du bloc « contrôles »
@@ -625,7 +653,7 @@ def rapport(path_xlsx, p, r, ctrl, sortie):
     L += [f"| **Total** | | | **{e['rtp']:.3%}** |", "",
           "## 4. Méthode", f"- Simulation : `simulateur.py`, graine {p['seed']}, {b['spins']:,} spins de base (strates du nombre de scatters),"
           f" {next(iter(r['achats'].values()))['sessions'] if r['achats'] else 0:,} tours par bonus.",
-          "- Le repo recommande ≥ 1 000 000 de spins pour orienter le calage et ≥ 20 000 000 pour valider.", "",
+          "- Le repo de skills recommande ≥ 1 000 000 de spins pour caler et ≥ 20 000 000 pour valider ; la doc Stake Engine demande 100 000 à 1 000 000 de résultats (books) par mode.", "",
           "## 5. Résultats", "", "| Indicateur | Exact | Simulé | Écart | Statut |", "|---|---|---|---|---|",
           f"| RTP | {e['rtp']:.3%} | {b['rtp']:.3%} ± {b['marge']:.3%} | {b['rtp'] - e['rtp']:+.3%} | "
           f"{'OK' if abs(b['rtp'] - e['rtp']) <= 3 * b['marge'] + 0.001 else 'ÉCART'} |"]

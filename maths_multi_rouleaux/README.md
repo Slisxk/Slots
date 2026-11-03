@@ -13,7 +13,7 @@ Un modèle de maths pour tes futures slots, réglé par défaut sur **96,2 % de 
 | **Bonus 1 « Free spins »** | 3 scatters, 10 FS, multis **non collants** (ils disparaissent après chaque spin), 31 % par colonne et par spin |
 | **Bonus 2 « Super free spins »** | 4 scatters ou plus, 10 FS, multis **collants** : un multi reste sur sa colonne jusqu'à la fin du bonus, et chaque nouveau multi sur cette colonne s'ajoute à sa valeur |
 | Retrigger | 3 scatters pendant les FS = +5 FS (environ 1 session sur 16) |
-| Bonus buy | Bonus 1 à 101x la mise. Le bonus 2 n'est pas achetable par défaut (voir plus bas) |
+| Bonus buy | Bonus 1 à 101x la mise (mode `bonus`), bonus 2 à 568x (mode `super`) |
 | Max win | 10 000x |
 
 **L'équilibre, d'après le calcul exact**
@@ -33,7 +33,7 @@ Simulation de 2 millions de spins : 30,4 % de tours gagnants (1 sur 3,3), écart
 |---|---|
 | `classeur_maths.xlsx` | La feuille de maths. Le **RTP exact** est calculé en formules, en direct : spins, chaque bonus, multis collants ou non, retriggers. Le Résumé montre l'équilibre et les contrôles. |
 | `generer_classeur.py` | Regénère le classeur avec les valeurs par défaut, ou d'autres valeurs (`python generer_classeur.py autre.xlsx "ACT_FS=(0.3,0.2,0.2)"`). |
-| `simulateur.py` | Calcul exact + simulation Monte Carlo : vérifie les formules, mesure la volatilité, le max win et les limites « 3 étoiles ». Écrit l'onglet Simulation et `rapport_validation.md`. |
+| `simulateur.py` | Calcul exact + simulation Monte Carlo : vérifie les formules, mesure la volatilité, le max win et les contrôles de risque du math SDK. Écrit l'onglet Simulation et `rapport_validation.md`. |
 | `rapport_validation.md` | Rapport de validation, au format du « Math Sign-Off Template » du repo de skills. |
 | `stake/` | Le jeu pour le math SDK de Stake Engine : `exporter.py`, `verifier_sdk.py`, `games/0_0_colonnes/`. |
 
@@ -46,7 +46,7 @@ Simulation de 2 millions de spins : 30,4 % de tours gagnants (1 sur 3,3), écart
    python simulateur.py classeur_maths.xlsx --exact     # calcul exact seulement, instantané
    python simulateur.py classeur_maths.xlsx --spins 20000000   # validation finale (≥ 20M conseillés)
    ```
-3. **Exporter vers le SDK** et générer les fichiers à publier (Python 3.12+, math SDK officiel cloné à côté) :
+3. **Exporter vers le SDK** et générer les fichiers à publier (Python 3.12+, [math SDK officiel](https://github.com/engineio/math-sdk) cloné à côté) :
    ```bash
    python stake/exporter.py classeur_maths.xlsx --game-id 0_0_colonnes --nom "Mon Jeu"
    cp -r stake/games/0_0_colonnes <math-sdk>/games/
@@ -59,26 +59,28 @@ Simulation de 2 millions de spins : 30,4 % de tours gagnants (1 sur 3,3), écart
 
 ## Les contrôles
 
-Les règles et les méthodes viennent du repo [Slot & Casino Game Developer Skills for Stake Engine](https://github.com/egorfedorov/Slot-Casino-Game-Developer-Skills-for-Stake-Engine) (`senior-game-math-engineer`, `rtp-optimizer`, `stake-game-developer`).
+Les règles viennent des repos officiels de Stake Engine ([github.com/engineio](https://github.com/engineio) : `docs` et `math-sdk`, version de novembre 2026). La méthode vient du repo [Slot & Casino Game Developer Skills for Stake Engine](https://github.com/egorfedorov/Slot-Casino-Game-Developer-Skills-for-Stake-Engine).
 
 | Règle | Source | Où |
 |---|---|---|
-| RTP entre 96,0 et 96,5 % | ta règle | Résumé |
-| Modes d'achat à 0,5 % maximum du jeu de base | `game-approval-checklist` | Résumé |
-| 1 tour gagnant sur 3 à 8 | `game-approval-checklist` | Résumé / Simulation |
-| Max win atteignable au moins 1 fois sur 20 000 000 | `game-approval-checklist` | Simulation |
-| RTP théorique = simulé = mesuré sur les books | `senior-game-math-engineer` | Simulation, `verifier_sdk.py`, SDK |
-| ≥ 1M de spins pour caler, ≥ 20M pour valider ; graine et empreinte du classeur notées | `senior-game-math-engineer` | `rapport_validation.md` |
+| RTP entre 96,0 et 96,5 % | ta règle (le math SDK refuse hors de 96,0–96,7 %, pour chaque mode) | Résumé |
+| Tous les modes à 0,5 % maximum du jeu de base | doc « Math Requirements » + FAQ | Résumé |
+| 1 tour gagnant sur 3 à 8, jamais moins de 1 sur 20 | checklist d'approbation + doc | Résumé / Simulation |
+| Max win plus fréquent que 1 sur 10 000 000 ; 1 000 000x au plus | doc « Math Requirements » + math SDK | Simulation |
+| Écart-type du jeu de base ≥ 0,6 ; un mode à 1x | math SDK (soumission) | Simulation |
+| **Contrôles de risque** : écart-type / coût ≤ 60 ; cvar ≤ 700 ; part du RTP venant des gains ≥ 40x le coût ≤ 0,9 et ≥ 10 000x ≤ 0,8 ; gains ≥ 5 000x ≤ 5 % | math SDK (`RISK_CHECKS`) : chaque contrôle raté baisse la mise maximale autorisée | Simulation, SDK |
+| 100 000 à 1 000 000 de résultats par mode dans les books | doc « Math Requirements » | `run.py --books` |
+| RTP théorique = simulé = mesuré sur les books | repo de skills | Simulation, `verifier_sdk.py`, SDK |
 | Équilibre : spins entre 55 et 70 % du RTP, aucun bonus au-dessus de 35 % | ta demande | Résumé |
-| Limites « 3 étoiles » (etl40b ≤ 0,9, etl10k ≤ 0,8, cvar ≤ 800) | math SDK | Simulation, SDK |
+
+Les « étoiles » de Stake (0 à 3) sont une note de qualité donnée par 3 relecteurs (créativité, finition) : elles ne dépendent pas des maths. Il faut au moins 1 étoile pour être publié.
 
 ## Points de conception
 
 - **Somme, pas produit.** Avec des multis jusqu'à x500, multiplier les colonnes entre elles ferait exploser les gains (x100 × x100). La somme garde des gros multis sans donner trop. Elle permet aussi un calcul exact simple en formules, valable pour les multis collants comme non collants.
 - **5 × 3 plutôt que 5 × 4.** Avec 4 lignes (1 024 ways), presque 1 spin sur 2 gagne : c'est hors de la règle « 1 sur 3 à 8 » et ça dilue les gains. Avec 243 ways, on est à 30 %.
 - **Peu de wilds en jeu de base, plus en bonus** : les spins restent sobres et les bonus généreux.
-- **Bonus 2 non achetable par défaut.** Le SDK limite l'espérance des gains de 10 000x à 0,8x la mise par tour, dans chaque mode : il faut donc moins de 1 max win sur 12 500 achats. Le bonus collant atteint le max bien plus souvent (environ 1 fois sur 500), donc le vendre obligerait à déformer fortement sa distribution. Il reste le gros bonus « mérité ». Pour le rendre achetable, mets un prix dans Config : la pondération rendra ses gros gains plus rares dans ce mode seulement.
-- **Achat du bonus 1** : la pondération rend ses gains de 4 000x et plus environ 2,6 fois plus rares, dans ce mode seulement. C'est le prix de la limite « 3 étoiles » etl40b avec des multis x500.
-- **Super Scatter de Gates of Olympus** (gains instantanés de 5 000x) : non inclus, car il pousse la volatilité au-delà des limites « 3 étoiles ».
+- **Les deux bonus sont achetables sans rien déformer.** Le math SDK rapporte ses contrôles de risque au prix du mode : les achats du bonus 1 (101x) et du bonus 2 (568x) les passent naturellement.
+- **Super Scatter de Gates of Olympus** (gains instantanés de 5 000x) : non inclus. Il ajouterait beaucoup de gains ≥ 5 000x et pèserait sur les contrôles de risque du jeu de base.
 
 Les ordres de grandeur s'inspirent des slots Pragmatic Play à succès : 5 × 3, bonus vers 1 spin sur 300 à 400, achat autour de 100x, 30 % de tours gagnants, multis additionnés. Ce ne sont pas des copies de leurs maths, qui ne sont pas publiques.

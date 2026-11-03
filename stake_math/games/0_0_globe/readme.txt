@@ -44,7 +44,7 @@ avec 3 / 4 / 5 symboles bonus ; le bonus obtenu peut monter avec les cascades), 
 
 #### Poids des résultats
 ponderation.py (appelé par run.py) : distribution naturelle du jeu mesurée par la feuille,
-RTP exact, limites « 3 étoiles » du SDK respectées.
+RTP exact, contrôles de risque du math SDK respectés.
 
 #### Max win
 wincap x la mise par tour : les cascades et les FS s'arrêtent quand il est atteint. La bande

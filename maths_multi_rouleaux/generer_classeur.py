@@ -8,7 +8,7 @@ Génère classeur_maths.xlsx : modèle de maths réutilisable « ways + multis d
 
 Le classeur calcule le RTP EXACT en formules (jeu de base, chaque bonus, multis collants ou non) :
 il se met à jour dès qu'on change une cellule. simulateur.py vérifie ces formules par simulation,
-mesure la volatilité, le max win et les limites « 3 étoiles », et écrit l'onglet Simulation.
+mesure la volatilité, le max win et les contrôles de risque du math SDK, et écrit l'onglet Simulation.
 """
 import sys
 from pathlib import Path
@@ -33,10 +33,10 @@ SYMBOLES = [  # code, nom, type, 3, 4, 5, 6 identiques (x mise totale, par way)
     ("H2", "Premium 2", "PAY", 1.4, 3.7, 13.0, 26.0),
     ("H3", "Premium 3", "PAY", 1.1, 2.8, 8.3, 16.0),
     ("H4", "Premium 4", "PAY", 0.9, 2.3, 5.5, 11.0),
-    ("L1", "Bas 1 (A)", "PAY", 0.55, 1.5, 3.0, 6.0),
-    ("L2", "Bas 2 (K)", "PAY", 0.45, 1.1, 2.2, 4.5),
+    ("L1", "Bas 1 (A)", "PAY", 0.5, 1.5, 3.0, 6.0),
+    ("L2", "Bas 2 (K)", "PAY", 0.5, 1.1, 2.2, 4.4),
     ("L3", "Bas 3 (Q)", "PAY", 0.4, 0.9, 1.8, 3.6),
-    ("L4", "Bas 4 (J)", "PAY", 0.35, 0.75, 1.5, 3.0),
+    ("L4", "Bas 4 (J)", "PAY", 0.3, 0.8, 1.5, 3.0),
     ("L5", "Bas 5 (10)", "PAY", 0.3, 0.7, 1.5, 3.0),
     ("W", "Wild", "WILD", 0, 0, 0, 0),
     ("S", "Scatter", "SCATTER", 0, 0, 0, 0),
@@ -46,7 +46,7 @@ W_BASE, S_BASE = 8, 21                     # peu de wilds en jeu de base (fréqu
 W_FS, S_FS = 40, 28                        # plus de wilds en free spins, scatters pour les retriggers
 BONUS = [  # nom, scatters, FS, multis collants, prix d'achat (vide = non achetable)
     ("Free spins", 3, 10, "NON", 101),
-    ("Super free spins", 4, 10, "OUI", None),
+    ("Super free spins", 4, 10, "OUI", 568),
     (None, None, None, None, None),
 ]
 MULTI_VALEURS = [2, 3, 4, 5, 10, 20, 50, 100, 250, 500]
@@ -57,7 +57,7 @@ MULTI_POIDS = {  # poids de chaque valeur : jeu de base, bonus 1, bonus 2, bonus
     "fs3": [300, 200, 150, 120, 100, 60, 30, 15, 5, 2],
 }
 ACT_BASE = 0.015                           # probabilité qu'une colonne reçoive un multi, par spin
-ACT_FS = (0.31, 0.25, 0.25)                # bonus 1 (non collant), 2 (collant), 3
+ACT_FS = (0.312, 0.25, 0.25)               # bonus 1 (non collant), 2 (collant), 3
 RETRIG_SCATTERS, RETRIG_FS = 3, 5
 RTP_CIBLE, RTP_MIN, RTP_MAX = 0.962, 0.96, 0.965
 MAX_WIN = 10_000
@@ -149,13 +149,13 @@ TXT = [
     ("", None),
     ("Pourquoi ce modèle est « équilibré »", f_sub),
     ("• Le RTP est calculé EXACTEMENT en formules (onglets Calc_*) : chaque composante (spins, chaque bonus) est visible dans le Résumé avec sa part du RTP.", None),
-    ("• L'onglet Contrôles vérifie les règles d'approbation Stake Engine (RTP, écart entre modes, fréquence de gain 1/3 à 1/8, max win atteignable) et les règles d'équilibre : les spins rapportent 55 à 70 % du RTP, aucun bonus ne dépasse 35 %.", None),
-    ("• Méthode et seuils repris du repo « Slot & Casino Game Developer Skills for Stake Engine » (senior-game-math-engineer, rtp-optimizer, stake-game-developer).", None),
+    ("• Les Contrôles du Résumé vérifient les règles de Stake Engine (doc d'approbation et math SDK : RTP de 96,0 à 96,7 % pour chaque mode, 0,5 % maximum entre les modes, au moins 1 tour gagnant sur 20, max win plus fréquent que 1 sur 10 000 000, contrôles de risque) et les règles d'équilibre : les spins rapportent 55 à 70 % du RTP, aucun bonus ne dépasse 35 %.", None),
+    ("• Seuils repris des repos officiels de Stake Engine (github.com/engineio : docs, math-sdk) et méthode du repo « Slot & Casino Game Developer Skills for Stake Engine ».", None),
     ("", None),
     ("Comment l'utiliser", f_sub),
     ("1. Modifie uniquement les cellules BLEUES sur fond jaune : Config, Paytable, Poids, Multis. Le Résumé et les Contrôles se recalculent tout de suite.", None),
     ("2. Quand le RTP exact est entre RTP_MIN et RTP_MAX et que les Contrôles sont OK, lance la simulation : python simulateur.py classeur_maths.xlsx", None),
-    ("   Elle vérifie les formules, mesure la volatilité, la fréquence du max win et les limites « 3 étoiles » du SDK, puis écrit l'onglet Simulation et rapport_validation.md.", None),
+    ("   Elle vérifie les formules, mesure la volatilité, la fréquence du max win et les contrôles de risque du math SDK de Stake Engine, puis écrit l'onglet Simulation et rapport_validation.md.", None),
     ("3. Exporte vers le math SDK de Stake Engine : dossier stake/ (voir README.md).", None),
     ("Pour une autre slot : change la grille (3 à 6 rouleaux, 2 à 6 lignes), les symboles, la paytable, les poids, les multis et les bonus. Garde le même ordre de symboles dans Paytable et dans les blocs de Poids.", None),
     ("", None),
@@ -177,15 +177,15 @@ cfg = [
     ("NB_LIGNES", "Nombre de lignes (hauteur)", NB_LIGNES, NUM, "2 à 6. Plus de lignes = plus de ways = gains plus fréquents."),
     ("NB_WAYS", "Nombre de ways", "=NB_LIGNES^NB_ROULEAUX", NUM, "Calculé."),
     ("RTP_CIBLE", "RTP visé", RTP_CIBLE, PCT, "Le SDK règle le RTP final exactement sur cette valeur (pondération)."),
-    ("RTP_MIN", "RTP minimum accepté", RTP_MIN, PCT, "Ta règle : 96 % minimum."),
-    ("RTP_MAX", "RTP maximum accepté", RTP_MAX, PCT, "Ta règle : 96,5 % maximum."),
-    ("MAX_WIN", "Max win (x mise)", MAX_WIN, NUM, "Plafond d'un tour. Doit être atteignable au moins 1 fois sur 20 000 000 (règle Stake)."),
+    ("RTP_MIN", "RTP minimum accepté", RTP_MIN, PCT, "Ta règle : 96 % minimum (le math SDK refuse en dessous de 96,0 %)."),
+    ("RTP_MAX", "RTP maximum accepté", RTP_MAX, PCT, "Ta règle : 96,5 % maximum (le math SDK refuse au-dessus de 96,7 %)."),
+    ("MAX_WIN", "Max win (x mise)", MAX_WIN, NUM, "Plafond d'un tour. Doit être plus fréquent que 1 sur 10 000 000 (doc Stake) ; 1 000 000x au plus (math SDK)."),
     ("RETRIG_SCATTERS", "Scatters pour un retrigger en FS", RETRIG_SCATTERS, NUM, ""),
     ("RETRIG_FS", "FS ajoutés par un retrigger", RETRIG_FS, NUM, ""),
     ("PART_SPINS_MIN", "Équilibre : part minimum des spins", 0.55, PCT, "Les spins doivent rapporter : sinon le jeu « ne donne rien » hors bonus."),
     ("PART_SPINS_MAX", "Équilibre : part maximum des spins", 0.70, PCT, "Au-delà, les bonus deviennent trop faibles."),
     ("PART_BONUS_MAX", "Équilibre : part maximum d'un bonus", 0.35, PCT, "Aucun bonus ne doit « tout donner »."),
-    ("HIT_MIN", "Fréquence de gain minimum", 1 / 8, PCT, "Règle d'approbation : 1 tour gagnant sur 3 à 8."),
+    ("HIT_MIN", "Fréquence de gain minimum", 1 / 8, PCT, "Checklist Stake : 1 tour gagnant sur 3 à 8 (jamais moins de 1 sur 20)."),
     ("HIT_MAX", "Fréquence de gain maximum", 1 / 3, PCT, ""),
     ("SIM_SPINS", "Spins de base simulés", 2_000_000, NUM, "Le repo conseille ≥ 1 000 000 pour caler et ≥ 20 000 000 pour valider."),
     ("SIM_BUY", "Tours simulés par bonus (comme un achat)", 100_000, NUM, ""),
@@ -222,7 +222,7 @@ B_ACTIF = [f"ISNUMBER(Config!$B${BONUS_R0 + k})" for k in range(3)]
 
 # ============================================================================ Paytable
 ws = wb.create_sheet("Paytable")
-title(ws, "Paytable (x mise totale, par way)", "Types : PAY = payant · WILD = remplace les payants (pas sur le rouleau 1) · SCATTER = déclenche les bonus.")
+title(ws, "Paytable (x mise totale, par way)", "Types : PAY = payant · WILD = remplace les payants (pas sur le rouleau 1) · SCATTER = déclenche les bonus. Valeurs en multiples de 0,1 (règle du SDK : gains par pas de 0,1x la mise).")
 header(ws, 3, 1, ["Code", "Symbole", "Type", "3 identiques", "4 identiques", "5 identiques", "6 identiques"])
 PT0 = 4
 for i, s in enumerate(SYMBOLES):
@@ -235,6 +235,7 @@ name("SYMBOLES", f"Paytable!$A${PT0}:$G${PT0 + N - 1}")
 dvt = DataValidation(type="list", formula1='"PAY,WILD,SCATTER"')
 ws.add_data_validation(dvt)
 dvt.add(f"C{PT0}:C{PT0 + N - 1}")
+note(ws, f"A{PT0 + N + 2}", "Règle du math SDK : chaque gain doit être un multiple de 0,1x la mise. Garde des gains en multiples de 0,1 et des multis entiers.")
 note(ws, f"A{PT0 + N + 1}", "Gain d'une way = valeur ci-dessus x multi de la way. Exemple : 3 ways de H1 sur 5 rouleaux = 3 x 20 = 60x la mise. La colonne « 6 identiques » ne sert qu'avec 6 rouleaux.")
 widths(ws, {"A": 8, "B": 16, "C": 10, "D": 13, "E": 13, "F": 13, "G": 13})
 
@@ -543,7 +544,7 @@ for k in range(3):
 for k in range(3):
     rr = ROWS_B[k]
     bk = BONUS_R0 + k
-    ctrl.append((f"Achat bonus {k + 1} : RTP exact", f"=H{rr}", PCT, "à 0,5 % du jeu de base (règle Stake)",
+    ctrl.append((f"Achat bonus {k + 1} : RTP exact", f"=H{rr}", PCT, "à 0,5 % du jeu de base (règle Stake, tous les modes)",
                  f'=IF(NOT(ISNUMBER(Config!E{bk})),"-",IF(ABS(H{rr}-{E_T})<=0.005,"OK","ÉCHEC"))'))
 for k in range(3):
     ctrl.append((f"Bonus {k + 1} : retriggers maîtrisés", f"={CALC[f'fs{k + 1}']['p_re']}*RETRIG_FS", DEC,
@@ -553,10 +554,14 @@ ctrl += [
      f'=IF(NOT(ISNUMBER({SIM("hit")})),"Lance la simulation",IF(AND({SIM("hit")}>=HIT_MIN,{SIM("hit")}<=HIT_MAX),"OK","ÉCHEC"))'),
     ("RTP simulé = RTP exact ?", f"={SIM('rtp')}", "0.000%", "écart < 3 marges d'erreur (+0,1 % de plafond)",
      f'=IF(NOT(ISNUMBER({SIM("rtp")})),"Lance la simulation",IF(ABS({SIM("rtp")}-{E_T})<=3*{SIM("marge")}+0.001,"OK","ÉCART"))'),
-    ("Max win atteignable", f"={SIM('p_max')}", "0.0000000%", "au moins 1 tour sur 20 000 000 (règle Stake)",
-     f'=IF(NOT(ISNUMBER({SIM("p_max")})),"Lance la simulation",IF({SIM("p_max")}>=1/20000000,"OK","ÉCHEC"))'),
-    ("3 étoiles : etl40b du jeu de base", f"={SIM('etl40b')}", "0.000", "≤ 0,9",
+    ("Max win atteignable", f"={SIM('p_max')}", "0.0000000%", "plus fréquent que 1 sur 10 000 000 (doc Stake)",
+     f'=IF(NOT(ISNUMBER({SIM("p_max")})),"Lance la simulation",IF({SIM("p_max")}>=1/10000000,"OK","ÉCHEC"))'),
+    ("Écart-type du jeu de base", f"={SIM('ecart_type')}", "0.00", "au moins 0,6 (soumission math SDK) ; ≤ 60 (risque)",
+     f'=IF(NOT(ISNUMBER({SIM("ecart_type")})),"Lance la simulation",IF(AND({SIM("ecart_type")}>=0.6,{SIM("ecart_type")}<=60),"OK","ÉCHEC"))'),
+    ("Risque : part du RTP ≥ 40x (base)", f"={SIM('etl40b')}", "0.000", "≤ 0,9 (contrôle de risque du math SDK)",
      f'=IF(NOT(ISNUMBER({SIM("etl40b")})),"Lance la simulation",IF({SIM("etl40b")}<=0.9,"OK","ÉCHEC"))'),
+    ("Risque : cvar (base)", f"={SIM('cvar')}", "0.0", "≤ 700 (contrôle de risque du math SDK)",
+     f'=IF(NOT(ISNUMBER({SIM("cvar")})),"Lance la simulation",IF({SIM("cvar")}<=700,"OK","ÉCHEC"))'),
 ]
 for i, (lbl, f, fmt, regle, st) in enumerate(ctrl):
     r = c0 + 1 + i
@@ -564,7 +569,7 @@ for i, (lbl, f, fmt, regle, st) in enumerate(ctrl):
     put(ws, f"B{r}", f, f_norm, fmt)
     put(ws, f"C{r}", regle, f_note)
     put(ws, f"D{r}", st, f_bold, align=center)
-note(ws, f"A{c0 + len(ctrl) + 2}", "Contrôles détaillés de la simulation (3 étoiles des achats, max win, etc.) : onglet Simulation et rapport_validation.md.")
+note(ws, f"A{c0 + len(ctrl) + 2}", "Contrôles détaillés de la simulation (risques des achats, max win, etc.) : onglet Simulation et rapport_validation.md. Les « étoiles » (0 à 3) sont la note de qualité donnée par 3 relecteurs Stake : elles ne dépendent pas des maths.")
 widths(ws, {"A": 52, "B": 16, "C": 44, "D": 14, "E": 14, "F": 12, "G": 14, "H": 14, "I": 14})
 
 for s in wb.worksheets:
