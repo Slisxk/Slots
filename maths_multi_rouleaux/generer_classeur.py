@@ -46,7 +46,7 @@ W_BASE, S_BASE = 8, 21                     # peu de wilds en jeu de base (fréqu
 W_FS, S_FS = 40, 28                        # plus de wilds en free spins, scatters pour les retriggers
 BONUS = [  # nom, scatters, FS, multis collants, prix d'achat (vide = non achetable)
     ("Free spins", 3, 10, "NON", 101),
-    ("Super free spins", 4, 10, "OUI", 568),
+    ("Super free spins", 4, 10, "OUI", 500),
     (None, None, None, None, None),
 ]
 MULTI_VALEURS = [2, 3, 4, 5, 10, 20, 50, 100, 250, 500]
@@ -56,8 +56,8 @@ MULTI_POIDS = {  # poids de chaque valeur : jeu de base, bonus 1, bonus 2, bonus
     "fs2": [300, 200, 150, 120, 100, 60, 30, 15, 5, 2],
     "fs3": [300, 200, 150, 120, 100, 60, 30, 15, 5, 2],
 }
-ACT_BASE = 0.015                           # probabilité qu'une colonne reçoive un multi, par spin
-ACT_FS = (0.312, 0.25, 0.25)               # bonus 1 (non collant), 2 (collant), 3
+ACT_BASE = 0.016                           # probabilité qu'une colonne reçoive un multi, par spin
+ACT_FS = (0.312, 0.22, 0.25)               # bonus 1 (non collant), 2 (collant), 3
 RETRIG_SCATTERS, RETRIG_FS = 3, 5
 RTP_CIBLE, RTP_MIN, RTP_MAX = 0.962, 0.96, 0.965
 MAX_WIN = 10_000
