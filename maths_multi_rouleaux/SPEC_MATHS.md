@@ -162,9 +162,9 @@ Les poids des résultats viennent d'une **pondération naturelle** : chaque bonu
 | RTP | **96,20 %** | **96,20 %** | **96,20 %** |
 | Gain moyen (× la mise de base) | 0,96 | 97,2 | 471 |
 | Fréquence de gain | 30,4 % (1 sur 3,3) | 99,3 % | 99,2 % |
-| Écart-type (× la mise) | 20,9 | 218 | 916 |
-| Gain médian | 0 | 43× | 195× |
-| Max win (10 000×) | ≈ 1 tour sur 3 000 000 | ≈ 1 achat sur 16 000 | ≈ 1 achat sur 450 |
+| Écart-type (× la mise) | 20,9 | 213 | 885 |
+| Gain médian | 0 | 43× | 197× |
+| Max win (10 000×) | ≈ 1 tour sur 3 000 000 | ≈ 1 achat sur 28 000 | ≈ 1 achat sur 850 |
 
 **Les bonus en jeu de base**
 
@@ -182,9 +182,9 @@ Les poids des résultats viennent d'une **pondération naturelle** : chaque bonu
 | Écart-type du jeu de base (soumission) | ≥ 0,6 | 20,9 | | |
 | Écart-type / coût (risque) | ≤ 60 | 20,9 | 2,2 | 1,9 |
 | Part du RTP venant des gains ≥ 40× le coût | ≤ 0,9 | 0,39 | 0,02 | 0 |
-| Part du RTP venant des gains ≥ 10 000× | ≤ 0,8 | 0,003 | 0,006 | 0,045 |
-| `cvar` : gain moyen des 0,1 % meilleurs tours / coût | ≤ 700 | 314 | 42 | 20 |
-| Gains de 5 000× et plus | ≤ 5 % | ≈ 0 | 0,02 % | 0,85 % |
+| Part du RTP venant des gains ≥ 10 000× | ≤ 0,8 | 0,003 | 0,004 | 0,024 |
+| `cvar` : gain moyen des 0,1 % meilleurs tours / coût | ≤ 700 | 314 | 40 | 20 |
+| Gains de 5 000× et plus | ≤ 5 % | ≈ 0 | 0,02 % | 0,81 % |
 | Mise maximale autorisée | | **1 000 $** (6 contrôles de risque sur 6) | | |
 
 Les « étoiles » de Stake (0 à 3) sont une note de qualité donnée par 3 relecteurs (créativité, finition) : elles ne dépendent pas des maths.
@@ -199,8 +199,8 @@ Les « étoiles » de Stake (0 à 3) sont une note de qualité donnée par 3 rel
 | 5–20× | 2,1 % | 21,2 % | 5,4 % |
 | 20–100× | 0,33 % | 46,2 % | 23,8 % |
 | 100–1 000× | 0,085 % | 24,4 % | 57,2 % |
-| 1 000–10 000× | 0,0045 % | 0,71 % | 10,7 % |
-| 10 000× (max win) | 0,00003 % | 0,0064 % | 0,22 % |
+| 1 000–10 000× | 0,0045 % | 0,71 % | 11,0 % |
+| 10 000× (max win) | 0,00003 % | 0,0036 % | 0,12 % |
 
 Pour la célébration des gains, `winLevel` (de 1 à 10) suit les seuils du SDK :
 - **par spin** : 1 = moins de 0,1×, 2 = jusqu'à 1×, 3 = 1–2×, 4 = 2–5×, 5 = 5–15×, 6 = 15–30×, 7 = 30–50×, 8 = 50–100×, 9 = 100× jusqu'au max win, 10 = max win ;

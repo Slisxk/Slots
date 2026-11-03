@@ -90,7 +90,7 @@ def _ecrire(path, poids_par_id, books):
     return sum(entiers[i] * books[i][1] for i in ids) / sum(entiers.values())
 
 
-def _ajuster(books, w0, cible_ev, cout, p_wc, ajustables=None):
+def _ajuster(books, w0, cible_ev, cout, p_wc, ajustables=None, p_max_total=False):
     """Part commune à tous les modes. w0 : poids naturels des résultats hors max win (somme 1).
     Seuls les résultats « ajustables » (tous par défaut) sont modifiés : w_i ∝ w0_i · exp(θ·p_i) ×
     réduction de la queue (l40, l10k), leur masse totale restant fixe. Le basculement exponentiel est
@@ -101,6 +101,12 @@ def _ajuster(books, w0, cible_ev, cout, p_wc, ajustables=None):
     moy_wc = float(np.mean([books[i][1] for i in wc])) if wc else 0.0
     if not wc:
         p_wc = 0.0
+    elif p_max_total:
+        # p_wc = probabilité naturelle TOTALE du max win (simulée). Une partie des autres résultats l'atteint déjà
+        # naturellement : les résultats « wincap » ne reçoivent que le complément, pour ne pas le compter deux fois.
+        tot = sum(w0[i] for i in w0 if w0[i] > 0)
+        deja = sum(w0[i] for i in w0 if w0[i] > 0 and books[i][1] >= moy_wc) / tot
+        p_wc = max((p_wc - deja) / (1 - deja), 1e-9)
     p_reste = 1 - p_wc
     cible = (cible_ev - p_wc * moy_wc) / p_reste
     tot0 = sum(w0[i] for i in ids)
@@ -153,7 +159,7 @@ def _ajuster(books, w0, cible_ev, cout, p_wc, ajustables=None):
     return poids, detail
 
 
-def _mode_spin(books, cible_ev, cout, p_wc, joint, hit):
+def _mode_spin(books, cible_ev, cout, p_wc, joint, hit, p_max_total=False):
     """Modes base / boost : poids naturels de chaque catégorie (mesurés par la feuille), puis _ajuster."""
     par_cle = {}
     for i, (c, p, k) in books.items():
@@ -186,16 +192,16 @@ def _mode_spin(books, cible_ev, cout, p_wc, joint, hit):
             w0[i] = pr / len(par_cle[cle]) / (1 - p_wc)
     # L'écart de RTP vient surtout du bruit des books « basegame » (les rares spins avec globe) : seuls
     # ces résultats sont ajustés ; les bonus gardent exactement leur distribution naturelle.
-    poids, detail = _ajuster(books, w0, cible_ev, cout, p_wc, ajustables=set(par_cle["basegame"]))
+    poids, detail = _ajuster(books, w0, cible_ev, cout, p_wc, ajustables=set(par_cle["basegame"]), p_max_total=p_max_total)
     detail.update({f"bonus{k}": round(sum(v for (c, kk), v in p_case.items() if kk == k), 8)
                    for k in range(1, len(joint) + 1)})
     return poids, detail
 
 
-def _mode_achat(books, cible_ev, cout, p_wc):
+def _mode_achat(books, cible_ev, cout, p_wc, p_max_total=False):
     """Modes bonus buy : tous les résultats ont le même poids naturel, puis _ajuster."""
     ids = [i for i, b in books.items() if b[0] != "wincap"]
-    return _ajuster(books, {i: 1.0 / len(ids) for i in ids}, cible_ev, cout, p_wc)
+    return _ajuster(books, {i: 1.0 / len(ids) for i in ids}, cible_ev, cout, p_wc, p_max_total=p_max_total)
 
 
 def ponderer(config, params, modes=None):
@@ -208,12 +214,13 @@ def ponderer(config, params, modes=None):
             continue
         books = _lire_books(os.path.join(config.publish_path, f"books_{mode}.jsonl.zst"))
         cible_ev = config.rtp * cout
-        # Max win : sa probabilité naturelle (simulée par la feuille) si elle est connue, sinon wincap_rtp du RTP
-        p_wc = (t.get(mode) or {}).get("p_wincap") or t["wincap_rtp"] * cout / config.wincap
+        # Max win : sa probabilité naturelle totale (simulée par la feuille) si elle est connue, sinon wincap_rtp du RTP
+        p_sim = (t.get(mode) or {}).get("p_wincap")
+        p_wc = p_sim or t["wincap_rtp"] * cout / config.wincap
         if mode in config.buy_modes:
-            poids, detail = _mode_achat(books, cible_ev, cout, p_wc)
+            poids, detail = _mode_achat(books, cible_ev, cout, p_wc, p_max_total=bool(p_sim))
         else:
-            poids, detail = _mode_spin(books, cible_ev, cout, p_wc, t[mode]["joint"], t[mode]["hit"])
+            poids, detail = _mode_spin(books, cible_ev, cout, p_wc, t[mode]["joint"], t[mode]["hit"], p_max_total=bool(p_sim))
         path = os.path.join(config.publish_path, f"lookUpTable_{mode}_0.csv")
         moyenne = _ecrire(path, poids, books)
         resume[mode] = {"rtp": moyenne / cout, **detail}
