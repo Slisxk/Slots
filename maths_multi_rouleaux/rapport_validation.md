@@ -3,8 +3,8 @@
 Format : « Math Sign-Off Template » du repo egorfedorov/Slot-Casino-Game-Developer-Skills-for-Stake-Engine.
 
 ## 1. Périmètre
-- Classeur : `classeur_maths.xlsx` (empreinte b16373c015e8)
-- Date : 2026-11-03 14:49
+- Classeur : `classeur_maths.xlsx` (empreinte f1355e409b30)
+- Date : 2026-11-03 14:53
 - Grille : 5 rouleaux x 3 lignes (243 ways)
 - Modes : base, achat bonus 1, achat bonus 2
 
@@ -56,9 +56,9 @@ Format : « Math Sign-Off Template » du repo egorfedorov/Slot-Casino-Game-Devel
 | Contrôles de risque Studio (base) | tous OK | RISK_CHECKS du SDK : chaque échec baisse la mise max autorisée | OK |
 | Achat bonus 1 : RTP simulé | 96.47% ± 1.37% | à 0,5 % du jeu de base (doc) ; la pondération du SDK le règle exactement | OK |
 | Achat bonus 1 : contrôles de risque Studio | tous OK | RISK_CHECKS du SDK ; sinon la pondération rend les plus gros gains de ce mode plus rares | OK |
-| Achat bonus 2 : RTP simulé | 94.02% ± 1.07% | à 0,5 % du jeu de base (doc) ; la pondération du SDK le règle exactement | ÉCHEC |
+| Achat bonus 2 : RTP simulé | 95.93% ± 1.10% | à 0,5 % du jeu de base (doc) ; la pondération du SDK le règle exactement | OK |
 | Achat bonus 2 : contrôles de risque Studio | tous OK | RISK_CHECKS du SDK ; sinon la pondération rend les plus gros gains de ce mode plus rares | OK |
 
 ## 7. Décision
-- Statut : **À REVOIR** (Achat bonus 2 : RTP simulé)
+- Statut : **VALIDÉ**
 - Rappel : la validation finale se fait sur les fichiers générés par le SDK (RTP pondéré des books).

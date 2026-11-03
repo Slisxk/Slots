@@ -9,23 +9,32 @@ Un modèle de maths pour tes futures slots, réglé par défaut sur **96,2 % de 
 | Grille | 5 rouleaux × 3 lignes, **243 ways** (format le plus courant chez Pragmatic Play) |
 | Gains | Ways de gauche à droite. Wild `W` (pas sur le rouleau 1), scatter `S` (au plus 1 par rouleau) |
 | **Multi de colonne** | Un multi de **x2 à x500** tombe sur un rouleau entier, de haut en bas. Une way est multipliée par la **somme** des multis des colonnes qu'elle traverse, comme les multis additionnés de Gates of Olympus. |
-| Jeu de base | Multis rares (1,5 % par colonne et par spin, environ 1 spin sur 14 en a un), surtout x2 à x5 : ça donne envie de spinner sans trop donner |
+| Jeu de base | Multis rares (1,6 % par colonne et par spin, environ 1 spin sur 13 en a un), surtout x2 à x5 : ça donne envie de spinner sans trop donner |
 | **Bonus 1 « Free spins »** | 3 scatters, 10 FS, multis **non collants** (ils disparaissent après chaque spin), 31 % par colonne et par spin |
 | **Bonus 2 « Super free spins »** | 4 scatters ou plus, 10 FS, multis **collants** : un multi reste sur sa colonne jusqu'à la fin du bonus, et chaque nouveau multi sur cette colonne s'ajoute à sa valeur |
 | Retrigger | 3 scatters pendant les FS = +5 FS (environ 1 session sur 16) |
-| Bonus buy | Bonus 1 à 101x la mise (mode `bonus`), bonus 2 à 568x (mode `super`) |
+| Bonus buy | Bonus 1 à 101x la mise (mode `bonus`), bonus 2 à 490x (mode `super`). Un achat à 500x au plus garde la mise maximale de 1 000 $ |
 | Max win | 10 000x |
 
 **L'équilibre, d'après le calcul exact**
 
 | Composante | Fréquence | Gain moyen | Part du RTP |
 |---|---|---|---|
-| Spins (multis compris) | chaque spin | 0,61x | **64 %** |
-| Bonus 1 (non collant) | 1 spin sur 334 | ≈ 96x (médiane ≈ 43x) | **30 %** |
-| Bonus 2 (collant) | 1 spin sur 8 700 | ≈ 546x | **7 %** |
-| **Total** | | | **96,18 %** |
+| Spins (multis compris) | chaque spin | 0,62x | **64 %** |
+| Bonus 1 (non collant) | 1 spin sur 334 | ≈ 97x (médiane ≈ 43x) | **30 %** |
+| Bonus 2 (collant) | 1 spin sur 8 700 | ≈ 480x (médiane ≈ 195x) | **6 %** |
+| **Total** | | | **96,26 %** (96,20 % après pondération SDK) |
 
-Simulation de 2 millions de spins : 30,4 % de tours gagnants (1 sur 3,3), écart-type de 19x, max win 1 tour sur 2,5 millions.
+Simulation de 2 millions de spins : 30,4 % de tours gagnants (1 sur 3,3), écart-type de 17x, max win environ 1 tour sur 3 millions. Fichiers Stake générés avec le math SDK officiel : RTP 96,20 % dans les 3 modes, 6 contrôles de risque sur 6, mise maximale de 1 000 $.
+
+## Quel fichier prendre
+
+| Pour… | Fichier |
+|---|---|
+| Faire le front-end (conversation avec Claude) | `PROMPT_SLOT.md` (à coller) + `SPEC_MATHS.md` + `sortie/config_fe_0_0_colonnes.json` (à joindre) |
+| Installer et utiliser tout ça sur ton Mac | `INSTALLATION_MAC.md` |
+| Régler les maths ou faire une autre slot du même type | `classeur_maths.xlsx` + `simulateur.py` |
+| Générer les fichiers à publier sur Stake | `stake/` (voir `INSTALLATION_MAC.md`, étape 3) |
 
 ## Les fichiers
 
@@ -36,6 +45,9 @@ Simulation de 2 millions de spins : 30,4 % de tours gagnants (1 sur 3,3), écart
 | `simulateur.py` | Calcul exact + simulation Monte Carlo : vérifie les formules, mesure la volatilité, le max win et les contrôles de risque du math SDK. Écrit l'onglet Simulation et `rapport_validation.md`. |
 | `rapport_validation.md` | Rapport de validation, au format du « Math Sign-Off Template » du repo de skills. |
 | `stake/` | Le jeu pour le math SDK de Stake Engine : `exporter.py`, `verifier_sdk.py`, `games/0_0_colonnes/`. |
+| `SPEC_MATHS.md`, `PROMPT_SLOT.md` | La spec pour le front-end et le texte à coller dans la conversation qui fait le jeu. |
+| `sortie/` | La config front-end et les statistiques du SDK. |
+| `INSTALLATION_MAC.md` | Le guide pour tout installer et lancer sur Mac. |
 
 ## Utilisation
 
@@ -80,7 +92,7 @@ Les « étoiles » de Stake (0 à 3) sont une note de qualité donnée par 3 rel
 - **Somme, pas produit.** Avec des multis jusqu'à x500, multiplier les colonnes entre elles ferait exploser les gains (x100 × x100). La somme garde des gros multis sans donner trop. Elle permet aussi un calcul exact simple en formules, valable pour les multis collants comme non collants.
 - **5 × 3 plutôt que 5 × 4.** Avec 4 lignes (1 024 ways), presque 1 spin sur 2 gagne : c'est hors de la règle « 1 sur 3 à 8 » et ça dilue les gains. Avec 243 ways, on est à 30 %.
 - **Peu de wilds en jeu de base, plus en bonus** : les spins restent sobres et les bonus généreux.
-- **Les deux bonus sont achetables sans rien déformer.** Le math SDK rapporte ses contrôles de risque au prix du mode : les achats du bonus 1 (101x) et du bonus 2 (568x) les passent naturellement.
+- **Les deux bonus sont achetables sans rien déformer.** Le math SDK rapporte ses contrôles de risque au prix du mode : les achats du bonus 1 (101x) et du bonus 2 (490x) les passent naturellement.
 - **Super Scatter de Gates of Olympus** (gains instantanés de 5 000x) : non inclus. Il ajouterait beaucoup de gains ≥ 5 000x et pèserait sur les contrôles de risque du jeu de base.
 
 Les ordres de grandeur s'inspirent des slots Pragmatic Play à succès : 5 × 3, bonus vers 1 spin sur 300 à 400, achat autour de 100x, 30 % de tours gagnants, multis additionnés. Ce ne sont pas des copies de leurs maths, qui ne sont pas publiques.

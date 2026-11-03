@@ -8,7 +8,7 @@ la distribution des gains ; ici on garde la distribution NATURELLE du jeu, mesur
     bonus réellement obtenu 1/2/3, lu dans l'événement freeSpinTrigger) reçoit sa probabilité réelle
     (params.json["targets"][mode]["joint"], simulée par la feuille) ; « basegame » (gagnant sans bonus)
     reçoit la fréquence de gain de la feuille moins les bonus ; « 0 » prend le reste ; le max win reçoit
-    wincap_rtp du RTP. Tous les résultats d'une case ont le même poids ;
+    sa probabilité simulée par la feuille (p_wincap), ou à défaut wincap_rtp du RTP. Tous les résultats d'une case ont le même poids ;
   * modes bonus buy : tous les résultats ont le même poids ;
   * puis le RTP est ajusté exactement par un « basculement exponentiel » (poids × exp(θ·gain)) : le plus
     petit écart possible à la distribution naturelle. Il ne corrige que le bruit des books. Dans les modes
@@ -208,7 +208,8 @@ def ponderer(config, params, modes=None):
             continue
         books = _lire_books(os.path.join(config.publish_path, f"books_{mode}.jsonl.zst"))
         cible_ev = config.rtp * cout
-        p_wc = t["wincap_rtp"] * cout / config.wincap
+        # Max win : sa probabilité naturelle (simulée par la feuille) si elle est connue, sinon wincap_rtp du RTP
+        p_wc = (t.get(mode) or {}).get("p_wincap") or t["wincap_rtp"] * cout / config.wincap
         if mode in config.buy_modes:
             poids, detail = _mode_achat(books, cible_ev, cout, p_wc)
         else:

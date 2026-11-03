@@ -46,7 +46,7 @@ W_BASE, S_BASE = 8, 21                     # peu de wilds en jeu de base (fréqu
 W_FS, S_FS = 40, 28                        # plus de wilds en free spins, scatters pour les retriggers
 BONUS = [  # nom, scatters, FS, multis collants, prix d'achat (vide = non achetable)
     ("Free spins", 3, 10, "NON", 101),
-    ("Super free spins", 4, 10, "OUI", 500),
+    ("Super free spins", 4, 10, "OUI", 490),
     (None, None, None, None, None),
 ]
 MULTI_VALEURS = [2, 3, 4, 5, 10, 20, 50, 100, 250, 500]
@@ -525,7 +525,7 @@ put(ws, f"A{rT + 1}", "Statut du RTP", f_bold)
 put(ws, f"E{rT + 1}", f'=IF(AND(E{rT}>=RTP_MIN,E{rT}<=RTP_MAX),"OK",IF(E{rT}<RTP_MIN,"Trop bas","Trop haut"))', f_bold, fill=fill_key)
 note(ws, f"A{rT + 2}", "Le SDK règle le RTP final exactement sur RTP_CIBLE ; le calcul exact doit déjà être dans [RTP_MIN ; RTP_MAX] pour que la distribution reste naturelle. "
      "Le plafond du max win retire en général moins de 0,1 % (voir Simulation).")
-note(ws, f"A{rT + 3}", "Prix conseillé d'un achat = (gain moyen du bonus + gain moyen du spin de déclenchement) / RTP_CIBLE.")
+note(ws, f"A{rT + 3}", "Prix conseillé d'un achat = (gain moyen du bonus + gain moyen du spin de déclenchement) / RTP_CIBLE, avant plafond. Un bonus qui touche souvent le max win (bonus collant) rapporte un peu moins une fois plafonné : regarde le prix conseillé de la Simulation. Un achat à 500x au plus garde la mise maximale de 1 000 $ (math SDK).")
 
 # ---- Contrôles
 c0 = rT + 6
@@ -544,8 +544,10 @@ for k in range(3):
 for k in range(3):
     rr = ROWS_B[k]
     bk = BONUS_R0 + k
-    ctrl.append((f"Achat bonus {k + 1} : RTP exact", f"=H{rr}", PCT, "à 0,5 % du jeu de base (règle Stake, tous les modes)",
-                 f'=IF(NOT(ISNUMBER(Config!E{bk})),"-",IF(ABS(H{rr}-{E_T})<=0.005,"OK","ÉCHEC"))'))
+    sim_rtp, sim_marge = SIMA("rtp", k + 1), SIMA("marge", k + 1)
+    ctrl.append((f"Achat bonus {k + 1} : RTP (simulé si disponible)", f"=IF(ISNUMBER({sim_rtp}),{sim_rtp},H{rr})", PCT,
+                 "à 0,5 % du jeu de base (règle Stake, tous les modes) ; la simulation compte le plafond du max win",
+                 f'=IF(NOT(ISNUMBER(Config!E{bk})),"-",IF(ISNUMBER({sim_rtp}),IF(ABS({sim_rtp}-{E_T})<=0.005+{sim_marge},"OK","ÉCHEC"),IF(ABS(H{rr}-{E_T})<=0.005,"OK","ÉCHEC")))'))
 for k in range(3):
     ctrl.append((f"Bonus {k + 1} : retriggers maîtrisés", f"={CALC[f'fs{k + 1}']['p_re']}*RETRIG_FS", DEC,
                  "P(retrigger) x FS ajoutés < 0,5", f'=IF(NOT({B_ACTIF[k]}),"-",IF({CALC[f"fs{k + 1}"]["p_re"]}*RETRIG_FS<0.5,"OK","ÉCHEC"))'))

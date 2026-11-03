@@ -85,7 +85,10 @@ def main():
     p = simulateur.load_params(a.classeur)
     e = simulateur.analytique(p)
     from openpyxl import load_workbook
-    hit = load_workbook(a.classeur)["Simulation"][simulateur.cellule("hit")].value
+    ws_sim = load_workbook(a.classeur)["Simulation"]
+    hit = ws_sim[simulateur.cellule("hit")].value
+    p_max = ws_sim[simulateur.cellule("p_max")].value
+    p_max_achat = {k: ws_sim[f"{'BCD'[k - 1]}{simulateur.SIM_LIGNE['a_p_max']}"].value for k in (1, 2, 3)}
     if not isinstance(hit, (int, float)):
         erreur("l'onglet Simulation est vide : lance d'abord  python simulateur.py <classeur>")
     if not p["rtp_min"] <= e["rtp"] <= p["rtp_max"]:
@@ -142,10 +145,12 @@ def main():
         "bonuses": bonuses,
         "scatter_weights": scat,
         "targets": {
-            # Pondération (ponderation.py) : max win = 0,1 % du RTP ; probabilité exacte de chaque bonus
-            # (calcul exact du classeur) ; fréquence de gain simulée
+            # Pondération (ponderation.py) : probabilité du max win simulée (sinon 0,1 % du RTP) ;
+            # probabilité exacte de chaque bonus (calcul exact du classeur) ; fréquence de gain simulée
             "wincap_rtp": 0.001,
-            "base": {"hit": float(hit), "joint": joint},
+            "base": {"hit": float(hit), "joint": joint, "p_wincap": float(p_max) if p_max else None},
+            **{MODES_ACHAT[k]: {"p_wincap": float(p_max_achat[k]) if p_max_achat.get(k) else None}
+               for k, b in enumerate(p["bonus"], 1) if b["prix"]},
         },
         "exact": {"rtp": e["rtp"], "spins": e["spins"],
                   **{f"bonus{k}": {"freq": e[f"bonus{k}"]["freq"], "gain": e[f"bonus{k}"]["gain"]} for k in range(1, nb + 1)}},

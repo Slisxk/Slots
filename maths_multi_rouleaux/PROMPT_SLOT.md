@@ -9,7 +9,7 @@ Je veux créer le front-end d'une slot pour Stake Engine. Les maths sont déjà 
 Une slot complète, jouable et prête à être publiée sur Stake Engine, avec **ma propre direction artistique**. Les maths ne bougent pas : le front-end ne fait que rejouer les résultats envoyés par le serveur de Stake (les « books »).
 
 ## Règles à respecter
-1. **Ne modifie jamais les maths** : ni les règles, ni la paytable, ni les multis, ni les bonus, ni les prix (101× et 500×), ni le RTP (96,20 %), ni le max win (10 000×). Si quelque chose te semble manquer dans la spec, demande-moi avant d'inventer.
+1. **Ne modifie jamais les maths** : ni les règles, ni la paytable, ni les multis, ni les bonus, ni les prix (101× et 490×), ni le RTP (96,20 %), ni le max win (10 000×). Si quelque chose te semble manquer dans la spec, demande-moi avant d'inventer.
 2. **Utilise le web SDK officiel de Stake Engine** : https://github.com/engineio/web-sdk (Svelte 5 + PixiJS 8, Node 22). Pars de son exemple de jeu le plus proche (ways / lines) et adapte-le. La doc est sur https://github.com/engineio/docs.
 3. **Gère chaque événement de la section 7** de la spec, dans l'ordre où ils arrivent. Fais particulièrement attention à :
    - `columnMultipliers`, l'événement propre à ce jeu : le multi tombe sur une colonne entière, de haut en bas, avec sa valeur bien visible. En bonus collant (`sticky: true`), les colonnes gardent leur multi et `columns` donne la valeur cumulée : anime l'addition (par exemple « x15 » qui devient « x25 ») ;
@@ -19,7 +19,7 @@ Une slot complète, jouable et prête à être publiée sur Stake Engine, avec *
    - les montants : entiers en centièmes de la mise.
 4. **Teste avec les exemples réels** de la section 9 de la spec, puis avec les books si je te les donne. Pour chaque cas, le gain affiché doit être exactement égal à `payoutMultiplier`.
 5. **Respecte les règles d'approbation de Stake** (section 10 de la spec) : jeu original, rien qui attire les mineurs, page de règles claire (avec le RTP et le max win de chaque mode, et les règles des deux bonus), bonne qualité visuelle.
-6. **Mobile et desktop**, avec les boutons standards : mise, spin (barre espace), autoplay avec confirmation, turbo, son, et un menu **bonus buy** avec les deux achats (Bonus 1 à 101×, Bonus 2 à 500×), chacun avec une confirmation. Prévois aussi le mode replay et le mode social de Stake.us (pas de mots « bet », « buy »…), décrits dans la doc.
+6. **Mobile et desktop**, avec les boutons standards : mise, spin (barre espace), autoplay avec confirmation, turbo, son, et un menu **bonus buy** avec les deux achats (Bonus 1 à 101×, Bonus 2 à 490×), chacun avec une confirmation. Prévois aussi le mode replay et le mode social de Stake.us (pas de mots « bet », « buy »…), décrits dans la doc.
 
 ## Comment procéder
 1. **Lis la spec**, puis pose-moi tes questions sur la DA : thème, ambiance, palette, style des symboles, à quoi ressemble le multi de colonne (et le multi collant), l'identité des deux bonus, musique et sons. Propose-moi 2 ou 3 directions si je n'ai pas encore d'idée précise.

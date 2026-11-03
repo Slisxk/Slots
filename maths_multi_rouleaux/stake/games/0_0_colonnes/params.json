@@ -211,7 +211,7 @@
       "scatters": 4,
       "spins": 10,
       "sticky": true,
-      "buy_cost": 500.0,
+      "buy_cost": 490.0,
       "mode": "super",
       "reels": "FR2",
       "column_multipliers": {
@@ -259,7 +259,14 @@
           0.0,
           0.00011463022411704051
         ]
-      ]
+      ],
+      "p_wincap": 3.382758729774368e-07
+    },
+    "bonus": {
+      "p_wincap": 3e-05
+    },
+    "super": {
+      "p_wincap": 0.0012
     }
   },
   "exact": {
