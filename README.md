@@ -27,7 +27,8 @@ Les deux dernières slots, multis de colonne et wilds collants, ont le même éq
 
 | Je veux… | Fichier |
 |---|---|
-| **Faire le front-end et la DA** d'une de ces slots dans un nouveau projet Claude | Le `PROMPT_PROJET.md` du dossier de la slot (tes idées à la fin), avec `SPEC_MATHS.md`, `README.md` et `sortie/config_fe_*.json` du même dossier |
+| **Faire le front-end et la DA** de la slot Multis de colonne ou Wilds collants, dans un nouveau projet Claude | Le `PROMPT_PROJET.md` du dossier de la slot (tes idées à la fin), avec `SPEC_MATHS.md`, `README.md` et `sortie/config_fe_*.json` du même dossier |
+| Faire le front-end de la slot **Globe** | `PROMPT_SLOT.md` + `SPEC_MATHS.md` (à la racine) + `stake_math/sortie/config_fe_0_0_globe.json`. Pour l'installation, voir `modele_maths/README.md` et `stake_math/README.md` |
 | **Créer les maths d'une nouvelle slot**, avec les mêmes cibles et les mêmes contrôles | [`PROMPT_NOUVELLES_MATHS.md`](PROMPT_NOUVELLES_MATHS.md) (le board et la feature à remplir) |
 | Installer et utiliser les maths sur mon Mac | Le `INSTALLATION_MAC.md` du dossier de la slot |
 | Régler les maths ou faire une variante | Le `classeur_maths.xlsx` et le `simulateur.py` du dossier de la slot |
